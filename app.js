@@ -367,7 +367,7 @@ function saveCustomName() {
     // Update self marker tooltip
     if (myMarker) {
       myMarker.unbindTooltip();
-      myMarker.bindTooltip(`${escapeHtml(myName)} (Tu)`, { permanent: false, direction: 'top', offset: [0, -10] });
+      myMarker.bindTooltip(`${escapeHtml(myName)} (Tu)`, { permanent: true, direction: 'top', offset: [0, -14] });
     }
 
     // Broadcast name update to room
