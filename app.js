@@ -34,11 +34,11 @@ function slugifyGroupName(name) {
     .trim()
     .replace(/[^a-z0-9àèéìòùáéíóú_-]/g, '-')
     .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '') || 'famiglia';
+    .replace(/^-|-$/g, '') || 'volantini-x';
 }
 
 function formatGroupName(slug) {
-  if (!slug) return 'Famiglia';
+  if (!slug) return 'Volantini X';
   return slug
     .split('-')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -47,8 +47,8 @@ function formatGroupName(slug) {
 
 // Group & Identity Resolution
 let rawHash = window.location.hash.substring(1).trim();
-let groupDisplayName = rawHash ? formatGroupName(rawHash) : 'Famiglia';
-let roomId = slugifyGroupName(rawHash || 'famiglia');
+let groupDisplayName = rawHash ? formatGroupName(rawHash) : 'Volantini X';
+let roomId = slugifyGroupName(rawHash || 'volantini-x');
 
 const myId = 'user-' + Math.random().toString(36).substring(2, 9);
 const myColor = stringToColor(myId);
@@ -1148,7 +1148,7 @@ if (togglePwdVisibilityBtn && roomPasswordInput && eyeIcon) {
 
 // Group Onboarding & Password Unlock Flow
 async function unlockWithCredentials(groupName, pwd, userName) {
-  groupName = (groupName || '').trim() || 'Famiglia';
+  groupName = (groupName || '').trim() || 'Volantini X';
   pwd = (pwd || '').trim();
   userName = (userName || '').trim() || myName;
 
