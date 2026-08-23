@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Live Map Tracker</title>
-  
+
   <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,27 +19,31 @@
   <link rel="stylesheet" href="style.css">
 
   <!-- Leaflet JS & MQTT.js via CDN -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 </head>
+
 <body>
   <!-- Fullscreen Map Container -->
   <div id="map"></div>
 
   <!-- Bottom Center Control Bar -->
   <div class="control-container">
-    <button id="toggle-tracking-btn" class="tracking-btn tracking-active" aria-label="Ferma o riprendi il tracciamento della posizione">
+    <button id="toggle-tracking-btn" class="tracking-btn tracking-active"
+      aria-label="Ferma o riprendi il tracciamento della posizione">
       <span class="btn-indicator"></span>
       <span class="btn-icon" id="btn-icon">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
           <rect x="5" y="5" width="14" height="14" rx="2.5" />
         </svg>
       </span>
-      <span class="btn-text" id="btn-text">Ferma Tracking</span>
+      <span class="btn-text" id="btn-text">STOP Tracking</span>
     </button>
   </div>
 
   <!-- Application Logic -->
   <script src="app.js"></script>
 </body>
+
 </html>

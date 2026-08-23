@@ -352,7 +352,7 @@ const btnText = document.getElementById('btn-text');
 function updateTrackingButtonUI() {
   if (isTracking) {
     toggleBtn.className = 'tracking-btn tracking-active';
-    btnText.textContent = 'Ferma Tracking';
+    btnText.textContent = 'STOP Tracking';
     btnIcon.innerHTML = `
       <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
         <rect x="5" y="5" width="14" height="14" rx="2.5" />
