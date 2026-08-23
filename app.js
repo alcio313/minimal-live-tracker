@@ -239,7 +239,7 @@ const closePrivacyBtn = document.getElementById('close-privacy-btn');
 const acceptPrivacyBtn = document.getElementById('accept-privacy-btn');
 
 if (roomNameDisplay) {
-  roomNameDisplay.textContent = `Gruppo: ${groupDisplayName}`;
+  roomNameDisplay.textContent = `${groupDisplayName}`;
 }
 if (selfColorDot) {
   selfColorDot.style.backgroundColor = myColor;
@@ -1183,7 +1183,7 @@ async function unlockWithCredentials(groupName, pwd, userName) {
   e2eeCryptoKey = await deriveKeyFromPassword(pwd, `geotrack_salt_v1_${roomId}`);
 
   if (roomNameDisplay) {
-    roomNameDisplay.textContent = `Gruppo: ${groupDisplayName}`;
+    roomNameDisplay.textContent = `${groupDisplayName}`;
   }
 
   if (myMarker) {
