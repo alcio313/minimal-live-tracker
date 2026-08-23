@@ -231,23 +231,38 @@
     </div>
   </div>
 
+  <!-- Zoom Controls (Senior-friendly large buttons) -->
+  <div class="zoom-controls-container">
+    <button id="zoom-in-btn" class="map-ctrl-btn" title="Ingrandisci mappa" aria-label="Ingrandisci mappa">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+    </button>
+    <button id="zoom-out-btn" class="map-ctrl-btn" title="Rimpicciolisci mappa" aria-label="Rimpicciolisci mappa">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+    </button>
+  </div>
+
   <!-- Bottom Center Control Bar -->
   <div class="control-container">
     <button id="toggle-tracking-btn" class="tracking-btn tracking-active"
-      aria-label="Ferma o riprendi il tracciamento della posizione">
+      aria-label="Ferma o avvia la condivisione della tua posizione">
       <span class="btn-indicator"></span>
       <span class="btn-icon" id="btn-icon">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-          <rect x="5" y="5" width="14" height="14" rx="2.5" />
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+          <rect x="4" y="4" width="16" height="16" rx="3" />
         </svg>
       </span>
-      <span class="btn-text" id="btn-text">STOP Tracking</span>
+      <span class="btn-text" id="btn-text">FERMA CONDIVISIONE</span>
     </button>
   </div>
 
   <!-- Recenter Button (Google Maps Style) -->
-  <button id="recenter-btn" class="recenter-btn" title="La tua posizione" aria-label="Centra mappa sulla tua posizione">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+  <button id="recenter-btn" class="recenter-btn" title="Centra la mappa su di te" aria-label="Centra mappa sulla tua posizione">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
       <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
     </svg>
   </button>

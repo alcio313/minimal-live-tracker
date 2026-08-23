@@ -391,7 +391,7 @@ function saveCustomName() {
   }
 }
 
-// Helper: Create custom animated radar marker
+// Helper: Create custom animated radar marker (48px Senior Accessible)
 function createMarkerIcon(color, isSelf = false) {
   return L.divIcon({
     className: '',
@@ -401,8 +401,8 @@ function createMarkerIcon(color, isSelf = false) {
         <div class="user-marker-core"></div>
       </div>
     `,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17]
+    iconSize: [48, 48],
+    iconAnchor: [24, 24]
   });
 }
 
@@ -425,7 +425,7 @@ function updateMyPosition(lat, lng, force = false) {
         icon: createMarkerIcon(myColor, true),
         zIndexOffset: 1000
       }).addTo(map);
-      myMarker.bindTooltip(`${escapeHtml(myName)} (Tu)`, { permanent: false, direction: 'top', offset: [0, -10] });
+      myMarker.bindTooltip(`${escapeHtml(myName)} (Tu)`, { permanent: true, direction: 'top', offset: [0, -14] });
     } else {
       myMarker.setLatLng(coord);
     }
@@ -433,8 +433,8 @@ function updateMyPosition(lat, lng, force = false) {
     if (!myPolyline) {
       myPolyline = L.polyline(myTrail, {
         color: myColor,
-        weight: 4,
-        opacity: 0.9,
+        weight: 6.5,
+        opacity: 0.95,
         smoothFactor: 1,
         lineCap: 'round',
         lineJoin: 'round'
@@ -487,8 +487,8 @@ function updateMyPosition(lat, lng, force = false) {
   if (!myPolyline) {
     myPolyline = L.polyline(myTrail, {
       color: myColor,
-      weight: 4,
-      opacity: 0.9,
+      weight: 6.5,
+      opacity: 0.95,
       smoothFactor: 1,
       lineCap: 'round',
       lineJoin: 'round'
@@ -530,13 +530,13 @@ function updatePeerPosition(id, color, coord, name) {
 
   peer.trail.push(coord);
 
-  // Update or create peer marker
+  // Update or create peer marker (48px Senior Accessible)
   if (!peer.marker) {
     peer.marker = L.marker(coord, {
       icon: createMarkerIcon(peer.color, false),
       zIndexOffset: 500
     }).addTo(map);
-    peer.marker.bindTooltip(escapeHtml(peer.name), { permanent: false, direction: 'top', offset: [0, -10] });
+    peer.marker.bindTooltip(escapeHtml(peer.name), { permanent: true, direction: 'top', offset: [0, -14] });
   } else {
     peer.marker.setLatLng(coord);
     if (name) {
@@ -548,8 +548,8 @@ function updatePeerPosition(id, color, coord, name) {
   if (!peer.polyline) {
     peer.polyline = L.polyline(peer.trail, {
       color: peer.color,
-      weight: 3.5,
-      opacity: 0.85,
+      weight: 6.5,
+      opacity: 0.95,
       smoothFactor: 1,
       lineCap: 'round',
       lineJoin: 'round'
@@ -588,7 +588,7 @@ function syncPeerTrail(id, color, fullTrail, name) {
       icon: createMarkerIcon(peer.color, false),
       zIndexOffset: 500
     }).addTo(map);
-    peer.marker.bindTooltip(escapeHtml(peer.name), { permanent: false, direction: 'top', offset: [0, -10] });
+    peer.marker.bindTooltip(escapeHtml(peer.name), { permanent: true, direction: 'top', offset: [0, -14] });
   } else {
     peer.marker.setLatLng(lastCoord);
     if (name) {
@@ -599,8 +599,8 @@ function syncPeerTrail(id, color, fullTrail, name) {
   if (!peer.polyline) {
     peer.polyline = L.polyline(peer.trail, {
       color: peer.color,
-      weight: 3.5,
-      opacity: 0.85,
+      weight: 6.5,
+      opacity: 0.95,
       smoothFactor: 1,
       lineCap: 'round',
       lineJoin: 'round'
@@ -913,10 +913,10 @@ const btnText = document.getElementById('btn-text');
 function updateTrackingButtonUI() {
   if (isTracking) {
     toggleBtn.className = 'tracking-btn tracking-active';
-    btnText.textContent = 'STOP Tracking';
+    btnText.textContent = 'FERMA CONDIVISIONE';
     btnIcon.innerHTML = `
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-        <rect x="5" y="5" width="14" height="14" rx="2.5" />
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+        <rect x="4" y="4" width="16" height="16" rx="3" />
       </svg>
     `;
     if (myMarker && myMarker.getElement()) {
@@ -924,9 +924,9 @@ function updateTrackingButtonUI() {
     }
   } else {
     toggleBtn.className = 'tracking-btn tracking-paused';
-    btnText.textContent = 'START Tracking';
+    btnText.textContent = 'AVVIA CONDIVISIONE';
     btnIcon.innerHTML = `
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
         <polygon points="6,4 20,12 6,20" />
       </svg>
     `;
@@ -935,6 +935,22 @@ function updateTrackingButtonUI() {
     }
   }
   renderParticipantsList();
+}
+
+// Zoom In / Out Controls (Senior Accessibility)
+const zoomInBtn = document.getElementById('zoom-in-btn');
+const zoomOutBtn = document.getElementById('zoom-out-btn');
+
+if (zoomInBtn) {
+  zoomInBtn.addEventListener('click', () => {
+    map.zoomIn();
+  });
+}
+
+if (zoomOutBtn) {
+  zoomOutBtn.addEventListener('click', () => {
+    map.zoomOut();
+  });
 }
 
 if (toggleBtn) {
