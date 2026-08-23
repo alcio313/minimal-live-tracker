@@ -153,6 +153,26 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r
   subdomains: 'abcd'
 }).addTo(map);
 
+// Battery Optimization & Sampling Configuration
+const SAMPLING_INTERVAL_MS = 15000; // 15 seconds
+const MIN_DISTANCE_METERS = 10;     // 10 meters
+
+let lastBroadcastTime = 0;
+let lastRecordedPos = null;
+
+// Haversine Distance Formula (in meters)
+function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 // Data Structures & Tracking State
 let myTrail = [];
 let myMarker = null;
@@ -386,34 +406,84 @@ function createMarkerIcon(color, isSelf = false) {
   });
 }
 
-// Update Local User Location & Past Trail
-function updateMyPosition(lat, lng) {
+// Update Local User Location & Past Trail (Filtered: 15s sampling, 10m distance threshold)
+function updateMyPosition(lat, lng, force = false) {
   if (!isTracking || !e2eeCryptoKey) return;
 
+  const now = Date.now();
   const coord = [lat, lng];
 
-  // Ignore duplicate consecutive points
-  if (myTrail.length > 0) {
-    const last = myTrail[myTrail.length - 1];
-    if (Math.abs(last[0] - lat) < 0.00001 && Math.abs(last[1] - lng) < 0.00001) {
-      return;
+  // If initial fix or forced, accept and broadcast immediately
+  if (!hasInitialGPSFix || force) {
+    hasInitialGPSFix = true;
+    lastBroadcastTime = now;
+    lastRecordedPos = coord;
+    myTrail.push(coord);
+
+    if (!myMarker) {
+      myMarker = L.marker(coord, {
+        icon: createMarkerIcon(myColor, true),
+        zIndexOffset: 1000
+      }).addTo(map);
+      myMarker.bindTooltip(`${escapeHtml(myName)} (Tu)`, { permanent: false, direction: 'top', offset: [0, -10] });
+    } else {
+      myMarker.setLatLng(coord);
     }
+
+    if (!myPolyline) {
+      myPolyline = L.polyline(myTrail, {
+        color: myColor,
+        weight: 4,
+        opacity: 0.9,
+        smoothFactor: 1,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(map);
+    } else {
+      myPolyline.setLatLngs(myTrail);
+    }
+
+    map.setView(coord, 16, { animate: true });
+
+    broadcast({
+      type: 'pos',
+      id: myId,
+      name: myName,
+      color: myColor,
+      coord: coord,
+      time: now
+    });
+    return;
   }
 
-  myTrail.push(coord);
-
-  // Update or create self marker
-  if (!myMarker) {
-    myMarker = L.marker(coord, {
-      icon: createMarkerIcon(myColor, true),
-      zIndexOffset: 1000
-    }).addTo(map);
-    myMarker.bindTooltip(`${escapeHtml(myName)} (Tu)`, { permanent: false, direction: 'top', offset: [0, -10] });
-  } else {
+  // Smoothly update visual marker position on local device
+  if (myMarker) {
     myMarker.setLatLng(coord);
   }
 
-  // Update or create self trail polyline
+  // Calculate distance moved from last recorded GPS point (Haversine in meters)
+  const distanceMoved = lastRecordedPos
+    ? getDistanceInMeters(lastRecordedPos[0], lastRecordedPos[1], lat, lng)
+    : 0;
+
+  // Filter 1: Has the user moved at least 10 meters?
+  if (distanceMoved < MIN_DISTANCE_METERS) {
+    // Under 10 meters -> skip saving trail and skip network broadcast to save battery
+    return;
+  }
+
+  // Filter 2: Has at least 15 seconds passed since the last broadcast?
+  const timeElapsed = now - lastBroadcastTime;
+  if (timeElapsed < SAMPLING_INTERVAL_MS) {
+    // Less than 15s -> hold update until 15s window completes
+    return;
+  }
+
+  // Both conditions met: >= 10m moved AND >= 15s elapsed
+  lastBroadcastTime = now;
+  lastRecordedPos = coord;
+  myTrail.push(coord);
+
   if (!myPolyline) {
     myPolyline = L.polyline(myTrail, {
       color: myColor,
@@ -427,20 +497,13 @@ function updateMyPosition(lat, lng) {
     myPolyline.setLatLngs(myTrail);
   }
 
-  // Pan to position on first GPS fix
-  if (!hasInitialGPSFix) {
-    hasInitialGPSFix = true;
-    map.setView(coord, 16, { animate: true });
-  }
-
-  // Broadcast to Room via MQTT
   broadcast({
     type: 'pos',
     id: myId,
     name: myName,
     color: myColor,
     coord: coord,
-    time: Date.now()
+    time: now
   });
 }
 
@@ -704,7 +767,7 @@ client.on('message', async (topic, message) => {
   }
 });
 
-// Start High Accuracy GPS Tracking
+// Start High Accuracy GPS Tracking (Optimized with 10s cached fix & 15s sampling)
 function startGeolocationTracking() {
   if (!e2eeCryptoKey) return;
   if ('geolocation' in navigator) {
@@ -722,8 +785,8 @@ function startGeolocationTracking() {
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 1000,
-        timeout: 10000
+        maximumAge: 10000, // 10s GNSS sleep optimization
+        timeout: 20000
       }
     );
   } else {
@@ -750,16 +813,17 @@ function startDesktopSimulation(baseLat, baseLng) {
   if (myTrail.length === 0) {
     simLat = baseLat + (Math.random() - 0.5) * 0.005;
     simLng = baseLng + (Math.random() - 0.5) * 0.005;
-    updateMyPosition(simLat, simLng);
+    updateMyPosition(simLat, simLng, true);
   }
 
+  // Aligned to 15-second battery sampling window (~15m displacement)
   simIntervalId = setInterval(() => {
     if (!isTracking || !e2eeCryptoKey) return;
     simAngle += (Math.random() - 0.5) * 0.4;
-    simLat += Math.cos(simAngle) * 0.00008;
-    simLng += Math.sin(simAngle) * 0.00008;
+    simLat += Math.cos(simAngle) * 0.00015;
+    simLng += Math.sin(simAngle) * 0.00015;
     updateMyPosition(simLat, simLng);
-  }, 3000);
+  }, 15000);
 }
 
 // Stop / Resume Button Handling
@@ -1017,7 +1081,7 @@ if (unlockRoomBtn) {
   });
 }
 
-// Periodic Heartbeat Ping & Presence Cleanup
+// Periodic Heartbeat Ping & Presence Cleanup (15s battery eco interval)
 setInterval(() => {
   if (client && client.connected && e2eeCryptoKey) {
     broadcast({
@@ -1029,7 +1093,7 @@ setInterval(() => {
     });
   }
   updateParticipantCount();
-}, 8000);
+}, 15000);
 
 // Notify other peers upon leaving
 window.addEventListener('beforeunload', () => {
