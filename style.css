@@ -125,10 +125,10 @@ html, body {
    🎮 Screen Map Controls (Large & Accessible)
    ========================================== */
 
-/* Zoom In / Out Buttons */
-.zoom-controls-container {
+/* Right-Side Map Controls Stack (Zoom In, Zoom Out, Recenter Location) */
+.map-controls-container {
   position: fixed;
-  top: 100px;
+  top: 90px;
   right: 20px;
   z-index: 1000;
   display: flex;
@@ -166,25 +166,12 @@ html, body {
   transform: translateY(0) scale(0.95);
 }
 
-/* Floating Recenter Location Button (Google Maps Style) */
+/* Recenter Button (Round, placed directly underneath zoom minus) */
 .recenter-btn {
-  position: fixed;
-  bottom: 28px;
-  right: 24px;
-  z-index: 1000;
-  width: 58px;
-  height: 58px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.98);
-  border: 2px solid #cbd5e1;
   color: #1a73e8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  outline: none;
-  box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.2);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-color: #cbd5e1;
+  margin-top: 4px;
 }
 
 .recenter-btn:hover {
@@ -192,7 +179,7 @@ html, body {
   background: #ffffff;
   color: #1557b0;
   border-color: #1a73e8;
-  box-shadow: 0 16px 32px -4px rgba(15, 23, 42, 0.26);
+  box-shadow: 0 14px 28px -4px rgba(26, 115, 232, 0.28);
 }
 
 .recenter-btn:active {
@@ -972,8 +959,8 @@ html, body {
     max-width: 120px;
   }
 
-  .zoom-controls-container {
-    top: 80px;
+  .map-controls-container {
+    top: 75px;
     right: 12px;
     gap: 8px;
   }
@@ -991,13 +978,6 @@ html, body {
     padding: 14px 24px;
     font-size: 15.5px;
     min-height: 54px;
-  }
-
-  .recenter-btn {
-    bottom: 20px;
-    right: 12px;
-    width: 52px;
-    height: 52px;
   }
 
   .modal-card {
