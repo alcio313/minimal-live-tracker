@@ -826,6 +826,85 @@ function startDesktopSimulation(baseLat, baseLng) {
   }, 15000);
 }
 
+// ==========================================
+// 🔊 Sound & Haptic Vibration Feedback
+// ==========================================
+let audioCtx = null;
+
+function getAudioContext() {
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      audioCtx = new AudioContextClass();
+    }
+  }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+// Play synthetic acoustic chime using Web Audio API
+function playFeedbackSound(isStart) {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+
+    if (isStart) {
+      // Start Sound: Ascending pleasant chime (520Hz -> 784Hz)
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(784, now + 0.12);
+
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.22);
+    } else {
+      // Stop Sound: Descending clear chime (740Hz -> 440Hz)
+      osc.frequency.setValueAtTime(740, now);
+      osc.frequency.exponentialRampToValueAtTime(440, now + 0.15);
+
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.25);
+    }
+  } catch (e) {
+    // Ignore audio autoplay restrictions
+  }
+}
+
+// Trigger haptic vibration on mobile devices
+function triggerHapticFeedback(isStart) {
+  try {
+    if ('vibrate' in navigator) {
+      if (isStart) {
+        // Start: Double crisp buzz [60ms on, 40ms off, 80ms on]
+        navigator.vibrate([60, 40, 80]);
+      } else {
+        // Stop: Solid single pulse [120ms on]
+        navigator.vibrate([120]);
+      }
+    }
+  } catch (e) {
+    // Vibration not supported
+  }
+}
+
 // Stop / Resume Button Handling
 const toggleBtn = document.getElementById('toggle-tracking-btn');
 const btnIcon = document.getElementById('btn-icon');
@@ -861,6 +940,10 @@ function updateTrackingButtonUI() {
 if (toggleBtn) {
   toggleBtn.addEventListener('click', () => {
     isTracking = !isTracking;
+
+    // Trigger Sound & Vibration Feedback
+    playFeedbackSound(isTracking);
+    triggerHapticFeedback(isTracking);
 
     if (isTracking) {
       startGeolocationTracking();
