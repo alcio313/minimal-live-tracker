@@ -41,14 +41,113 @@ const myColor = stringToColor(myId);
 // User Custom Display Name
 let myName = localStorage.getItem('tracker_username') || `Utente-${myId.substring(5, 9)}`;
 
-// Initialize Leaflet Map (Fullscreen, Clear Standard Theme)
+// ==========================================
+// 🔐 End-to-End Encryption (E2EE) WebCrypto
+// ==========================================
+let e2eeCryptoKey = null;
+let currentRoomPassword = sessionStorage.getItem(`e2ee_pwd_${roomId}`) || '';
+
+async function deriveKeyFromPassword(password, roomSalt) {
+  const enc = new TextEncoder();
+  const passwordKey = await window.crypto.subtle.importKey(
+    'raw',
+    enc.encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+
+  const salt = enc.encode(roomSalt || `geotrack_salt_v1_${roomId}`);
+
+  return window.crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    passwordKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptPayload(dataObj) {
+  if (!e2eeCryptoKey) return null;
+  const enc = new TextEncoder();
+  const plaintext = enc.encode(JSON.stringify(dataObj));
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+  const ciphertextBuffer = await window.crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv: iv
+    },
+    e2eeCryptoKey,
+    plaintext
+  );
+
+  // Convert Uint8Array to Base64
+  const ivBase64 = btoa(String.fromCharCode(...iv));
+  const ctArray = new Uint8Array(ciphertextBuffer);
+  let ctString = '';
+  for (let i = 0; i < ctArray.length; i++) {
+    ctString += String.fromCharCode(ctArray[i]);
+  }
+  const ctBase64 = btoa(ctString);
+
+  return {
+    e2ee: true,
+    iv: ivBase64,
+    ct: ctBase64,
+    v: 1
+  };
+}
+
+async function decryptPayload(encryptedPacket) {
+  if (!encryptedPacket || !encryptedPacket.e2ee || !encryptedPacket.iv || !encryptedPacket.ct) {
+    return null;
+  }
+  if (!e2eeCryptoKey) return null;
+
+  try {
+    const ivStr = atob(encryptedPacket.iv);
+    const iv = new Uint8Array(ivStr.length);
+    for (let i = 0; i < ivStr.length; i++) {
+      iv[i] = ivStr.charCodeAt(i);
+    }
+
+    const ctStr = atob(encryptedPacket.ct);
+    const ct = new Uint8Array(ctStr.length);
+    for (let i = 0; i < ctStr.length; i++) {
+      ct[i] = ctStr.charCodeAt(i);
+    }
+
+    const decryptedBuffer = await window.crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv
+      },
+      e2eeCryptoKey,
+      ct
+    );
+
+    const dec = new TextDecoder();
+    return JSON.parse(dec.decode(decryptedBuffer));
+  } catch (err) {
+    // Decryption failed: wrong password or tampered packet
+    return null;
+  }
+}
+
+// 🗺️ Leaflet Map Setup
 const map = L.map('map', {
   zoomControl: false,
   attributionControl: false,
   fadeAnimation: true
-}).setView([41.9028, 12.4964], 15); // Initial view
+}).setView([41.9028, 12.4964], 15);
 
-// High performance clear standard tiles (CartoDB Voyager / OpenStreetMap)
 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
   maxZoom: 20,
   subdomains: 'abcd'
@@ -76,7 +175,16 @@ const userCountText = document.getElementById('user-count-text');
 const roomBadge = document.getElementById('room-badge');
 const toast = document.getElementById('toast');
 
-// Modal UI Elements
+// E2EE Modal Elements
+const e2eeModal = document.getElementById('e2ee-modal');
+const e2eeForm = document.getElementById('e2ee-form');
+const roomPasswordInput = document.getElementById('room-password-input');
+const togglePwdVisibilityBtn = document.getElementById('toggle-pwd-visibility-btn');
+const eyeIcon = document.getElementById('eye-icon');
+const unlockRoomBtn = document.getElementById('unlock-room-btn');
+const modalChangePwdBtn = document.getElementById('modal-change-pwd-btn');
+
+// Participants Modal Elements
 const participantsModal = document.getElementById('participants-modal');
 const closeModalBtn = document.getElementById('close-modal-btn');
 const usernameInput = document.getElementById('username-input');
@@ -85,6 +193,13 @@ const selfColorDot = document.getElementById('self-color-dot');
 const modalCountBadge = document.getElementById('modal-count-badge');
 const participantsList = document.getElementById('participants-list');
 const shareRoomBtn = document.getElementById('share-room-btn');
+
+// Privacy Modal Elements
+const privacyBtn = document.getElementById('privacy-btn');
+const modalPrivacyLinkBtn = document.getElementById('modal-privacy-link-btn');
+const privacyModal = document.getElementById('privacy-modal');
+const closePrivacyBtn = document.getElementById('close-privacy-btn');
+const acceptPrivacyBtn = document.getElementById('accept-privacy-btn');
 
 if (roomNameDisplay) {
   roomNameDisplay.textContent = roomId;
@@ -171,7 +286,7 @@ function updateParticipantCount() {
   renderParticipantsList();
 }
 
-// Modal Control
+// Modal Control Functions
 function openParticipantsModal() {
   if (participantsModal) {
     if (usernameInput) usernameInput.value = myName;
@@ -186,6 +301,38 @@ function closeParticipantsModal() {
   if (participantsModal) {
     participantsModal.classList.remove('is-open');
     participantsModal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function openPrivacyModal() {
+  if (privacyModal) {
+    privacyModal.classList.add('is-open');
+    privacyModal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function closePrivacyModal() {
+  if (privacyModal) {
+    privacyModal.classList.remove('is-open');
+    privacyModal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function openE2EEModal() {
+  if (e2eeModal) {
+    e2eeModal.classList.add('is-open');
+    e2eeModal.setAttribute('aria-hidden', 'false');
+    if (roomPasswordInput) {
+      roomPasswordInput.value = currentRoomPassword;
+      setTimeout(() => roomPasswordInput.focus(), 150);
+    }
+  }
+}
+
+function closeE2EEModal() {
+  if (e2eeModal) {
+    e2eeModal.classList.remove('is-open');
+    e2eeModal.setAttribute('aria-hidden', 'true');
   }
 }
 
@@ -241,7 +388,7 @@ function createMarkerIcon(color, isSelf = false) {
 
 // Update Local User Location & Past Trail
 function updateMyPosition(lat, lng) {
-  if (!isTracking) return;
+  if (!isTracking || !e2eeCryptoKey) return;
 
   const coord = [lat, lng];
 
@@ -400,7 +547,7 @@ function syncPeerTrail(id, color, fullTrail, name) {
   }
 }
 
-// Real-Time Serverless Network (Public MQTT over WebSockets)
+// 📡 Real-Time Serverless Network (MQTT over WebSockets)
 const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
 const TOPIC_PREFIX = `geotrack_minimal_v1/${roomId}`;
 const MY_TOPIC = `${TOPIC_PREFIX}/${myId}`;
@@ -413,15 +560,21 @@ const client = mqtt.connect(MQTT_BROKER, {
   clientId: myId
 });
 
-function broadcast(data) {
-  if (client.connected) {
-    client.publish(MY_TOPIC, JSON.stringify(data), { qos: 0 });
+async function broadcast(data) {
+  if (!e2eeCryptoKey || !client.connected) return;
+  try {
+    const encryptedPacket = await encryptPayload(data);
+    if (encryptedPacket) {
+      client.publish(MY_TOPIC, JSON.stringify(encryptedPacket), { qos: 0 });
+    }
+  } catch (err) {
+    console.warn('Broadcast encryption error:', err);
   }
 }
 
 client.on('connect', () => {
   client.subscribe(ROOM_WILDCARD, (err) => {
-    if (!err) {
+    if (!err && e2eeCryptoKey) {
       broadcast({
         type: 'join',
         id: myId,
@@ -434,10 +587,11 @@ client.on('connect', () => {
   });
 });
 
-client.on('message', (topic, message) => {
+client.on('message', async (topic, message) => {
   try {
-    const data = JSON.parse(message.toString());
-    if (data.id === myId) return;
+    const rawData = JSON.parse(message.toString());
+    const data = await decryptPayload(rawData);
+    if (!data || data.id === myId) return;
 
     let peer = peers.get(data.id);
     if (peer) {
@@ -546,12 +700,13 @@ client.on('message', (topic, message) => {
       updateParticipantCount();
     }
   } catch (e) {
-    // Ignore malformed packets
+    // Ignore packet
   }
 });
 
 // Start High Accuracy GPS Tracking
 function startGeolocationTracking() {
+  if (!e2eeCryptoKey) return;
   if ('geolocation' in navigator) {
     geoWatchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -590,7 +745,7 @@ function stopGeolocationTracking() {
 
 // Fallback: subtle movement if GPS is unavailable (e.g. desktop testing)
 function startDesktopSimulation(baseLat, baseLng) {
-  if (simIntervalId) return;
+  if (simIntervalId || !e2eeCryptoKey) return;
 
   if (myTrail.length === 0) {
     simLat = baseLat + (Math.random() - 0.5) * 0.005;
@@ -599,7 +754,7 @@ function startDesktopSimulation(baseLat, baseLng) {
   }
 
   simIntervalId = setInterval(() => {
-    if (!isTracking) return;
+    if (!isTracking || !e2eeCryptoKey) return;
     simAngle += (Math.random() - 0.5) * 0.4;
     simLat += Math.cos(simAngle) * 0.00008;
     simLng += Math.sin(simAngle) * 0.00008;
@@ -651,7 +806,6 @@ if (toggleBtn) {
 
     updateTrackingButtonUI();
 
-    // Broadcast tracking status
     broadcast({
       type: 'status',
       id: myId,
@@ -757,49 +911,7 @@ if (shareRoomBtn) {
   });
 }
 
-// Periodic Heartbeat Ping & Presence Cleanup
-setInterval(() => {
-  if (client && client.connected) {
-    broadcast({
-      type: 'ping',
-      id: myId,
-      name: myName,
-      color: myColor,
-      tracking: isTracking
-    });
-  }
-  updateParticipantCount();
-}, 8000);
-
-// Notify other peers upon leaving
-window.addEventListener('beforeunload', () => {
-  broadcast({
-    type: 'leave',
-    id: myId
-  });
-});
-
-// Privacy Policy Modal Handling
-const privacyBtn = document.getElementById('privacy-btn');
-const modalPrivacyLinkBtn = document.getElementById('modal-privacy-link-btn');
-const privacyModal = document.getElementById('privacy-modal');
-const closePrivacyBtn = document.getElementById('close-privacy-btn');
-const acceptPrivacyBtn = document.getElementById('accept-privacy-btn');
-
-function openPrivacyModal() {
-  if (privacyModal) {
-    privacyModal.classList.add('is-open');
-    privacyModal.setAttribute('aria-hidden', 'false');
-  }
-}
-
-function closePrivacyModal() {
-  if (privacyModal) {
-    privacyModal.classList.remove('is-open');
-    privacyModal.setAttribute('aria-hidden', 'true');
-  }
-}
-
+// Privacy Modal Handlers
 if (privacyBtn) {
   privacyBtn.addEventListener('click', openPrivacyModal);
 }
@@ -827,9 +939,121 @@ if (privacyModal) {
   });
 }
 
-// Initial Tracking & Presence Boot
-startGeolocationTracking();
-updateParticipantCount();
+// Change Password Handler
+if (modalChangePwdBtn) {
+  modalChangePwdBtn.addEventListener('click', () => {
+    closeParticipantsModal();
+    openE2EEModal();
+  });
+}
+
+// Toggle Password Visibility
+if (togglePwdVisibilityBtn && roomPasswordInput && eyeIcon) {
+  togglePwdVisibilityBtn.addEventListener('click', () => {
+    const isPass = roomPasswordInput.type === 'password';
+    roomPasswordInput.type = isPass ? 'text' : 'password';
+    eyeIcon.innerHTML = isPass
+      ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>`
+      : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>`;
+  });
+}
+
+// Password Unlock Flow
+async function unlockWithPassword(pwd) {
+  pwd = (pwd || '').trim();
+  if (!pwd) {
+    if (roomPasswordInput) roomPasswordInput.focus();
+    return;
+  }
+
+  currentRoomPassword = pwd;
+  sessionStorage.setItem(`e2ee_pwd_${roomId}`, pwd);
+
+  // Derive AES-GCM 256 Key
+  e2eeCryptoKey = await deriveKeyFromPassword(pwd);
+
+  closeE2EEModal();
+
+  if (toast) {
+    toast.textContent = '🔐 Crittografia E2EE attivata!';
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+      toast.textContent = 'Link stanza copiato!';
+    }, 2200);
+  }
+
+  // Start tracking and join room
+  startGeolocationTracking();
+  updateParticipantCount();
+
+  if (client.connected) {
+    broadcast({
+      type: 'join',
+      id: myId,
+      name: myName,
+      color: myColor,
+      trail: myTrail,
+      tracking: isTracking
+    });
+  }
+}
+
+if (e2eeForm) {
+  e2eeForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (roomPasswordInput) {
+      unlockWithPassword(roomPasswordInput.value);
+    }
+  });
+}
+
+if (unlockRoomBtn) {
+  unlockRoomBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (roomPasswordInput) {
+      unlockWithPassword(roomPasswordInput.value);
+    }
+  });
+}
+
+// Periodic Heartbeat Ping & Presence Cleanup
+setInterval(() => {
+  if (client && client.connected && e2eeCryptoKey) {
+    broadcast({
+      type: 'ping',
+      id: myId,
+      name: myName,
+      color: myColor,
+      tracking: isTracking
+    });
+  }
+  updateParticipantCount();
+}, 8000);
+
+// Notify other peers upon leaving
+window.addEventListener('beforeunload', () => {
+  if (e2eeCryptoKey) {
+    broadcast({
+      type: 'leave',
+      id: myId
+    });
+  }
+});
+
+// Initial Session Startup
+async function initSession() {
+  if (currentRoomPassword) {
+    e2eeCryptoKey = await deriveKeyFromPassword(currentRoomPassword);
+    startGeolocationTracking();
+    updateParticipantCount();
+  } else {
+    openE2EEModal();
+  }
+}
+
+initSession();
+
 
 
 
