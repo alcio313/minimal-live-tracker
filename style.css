@@ -1,0 +1,84 @@
+/* Reset & Fullscreen Map */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #0b0f19;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  user-select: none;
+}
+
+#map {
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  background: #0b0f19;
+}
+
+/* Hide all default Leaflet controls and attribution for a pure clean canvas */
+.leaflet-control-container .leaflet-top,
+.leaflet-control-container .leaflet-bottom {
+  display: none !important;
+}
+
+/* Animated Glowing Radar Pulse Marker */
+.user-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.user-marker-pulse {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--marker-color, #00f0ff);
+  opacity: 0.6;
+  animation: radar-pulse 2s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
+  pointer-events: none;
+}
+
+.user-marker-core {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid var(--marker-color, #00f0ff);
+  box-shadow: 0 0 12px var(--marker-color, #00f0ff), 0 0 24px var(--marker-color, #00f0ff);
+  z-index: 2;
+}
+
+.user-marker.is-self .user-marker-core {
+  border-width: 3px;
+  box-shadow: 0 0 16px var(--marker-color, #00f0ff), 0 0 30px rgba(255, 255, 255, 0.8);
+}
+
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
