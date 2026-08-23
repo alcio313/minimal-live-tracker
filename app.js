@@ -58,6 +58,30 @@ let simAngle = Math.random() * Math.PI * 2;
 // Peer Store: peerId -> { color, trail: [[lat, lng]], marker, polyline, isPaused }
 const peers = new Map();
 
+// UI References
+const roomNameDisplay = document.getElementById('room-name-display');
+const userCountText = document.getElementById('user-count-text');
+const roomBadge = document.getElementById('room-badge');
+const toast = document.getElementById('toast');
+
+if (roomNameDisplay) {
+  roomNameDisplay.textContent = roomId;
+}
+
+// Update Active Participants Counter
+function updateParticipantCount() {
+  if (!userCountText) return;
+  const now = Date.now();
+  let activePeers = 0;
+  for (const [id, peer] of peers.entries()) {
+    if (now - (peer.lastSeen || 0) < 25000) {
+      activePeers++;
+    }
+  }
+  const total = 1 + activePeers;
+  userCountText.textContent = total === 1 ? '1 online' : `${total} online`;
+}
+
 // Helper: Create custom animated radar marker
 function createMarkerIcon(color, isSelf = false) {
   return L.divIcon({
@@ -140,9 +164,12 @@ function updatePeerPosition(id, color, coord) {
       trail: [],
       marker: null,
       polyline: null,
-      isPaused: false
+      isPaused: false,
+      lastSeen: Date.now()
     };
     peers.set(id, peer);
+  } else {
+    peer.lastSeen = Date.now();
   }
 
   peer.trail.push(coord);
@@ -183,9 +210,12 @@ function syncPeerTrail(id, color, fullTrail) {
       trail: [],
       marker: null,
       polyline: null,
-      isPaused: false
+      isPaused: false,
+      lastSeen: Date.now()
     };
     peers.set(id, peer);
+  } else {
+    peer.lastSeen = Date.now();
   }
 
   peer.trail = fullTrail;
@@ -252,7 +282,23 @@ client.on('message', (topic, message) => {
     const data = JSON.parse(message.toString());
     if (data.id === myId) return;
 
+    let peer = peers.get(data.id);
+    if (peer) {
+      peer.lastSeen = Date.now();
+    }
+
     if (data.type === 'join') {
+      if (!peer) {
+        peer = {
+          color: data.color || stringToColor(data.id),
+          trail: [],
+          marker: null,
+          polyline: null,
+          isPaused: false,
+          lastSeen: Date.now()
+        };
+        peers.set(data.id, peer);
+      }
       if (myTrail.length > 0) {
         broadcast({
           type: 'sync',
@@ -265,12 +311,37 @@ client.on('message', (topic, message) => {
       if (data.trail && data.trail.length > 0) {
         syncPeerTrail(data.id, data.color, data.trail);
       }
+      updateParticipantCount();
     } else if (data.type === 'sync') {
       syncPeerTrail(data.id, data.color, data.trail);
+      updateParticipantCount();
     } else if (data.type === 'pos' && data.coord) {
       updatePeerPosition(data.id, data.color, data.coord);
+      updateParticipantCount();
+    } else if (data.type === 'ping') {
+      if (!peer) {
+        peer = {
+          color: data.color || stringToColor(data.id),
+          trail: [],
+          marker: null,
+          polyline: null,
+          isPaused: false,
+          lastSeen: Date.now()
+        };
+        peers.set(data.id, peer);
+      }
+      peer.lastSeen = Date.now();
+      updateParticipantCount();
+    } else if (data.type === 'leave') {
+      if (peers.has(data.id)) {
+        const leavingPeer = peers.get(data.id);
+        if (leavingPeer && leavingPeer.marker) {
+          map.removeLayer(leavingPeer.marker);
+        }
+        peers.delete(data.id);
+        updateParticipantCount();
+      }
     } else if (data.type === 'status') {
-      let peer = peers.get(data.id);
       if (peer && peer.marker) {
         const el = peer.marker.getElement();
         if (el) {
@@ -281,6 +352,7 @@ client.on('message', (topic, message) => {
           }
         }
       }
+      updateParticipantCount();
     }
   } catch (e) {
     // Ignore malformed packets
@@ -434,7 +506,53 @@ if (recenterBtn) {
   });
 }
 
-// Initial Tracking Boot
+// Room Link Copy Action
+if (roomBadge) {
+  roomBadge.addEventListener('click', async () => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(window.location.href);
+      } else {
+        const tempInput = document.createElement('input');
+        tempInput.value = window.location.href;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+      }
+      if (toast) {
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2200);
+      }
+    } catch (err) {
+      console.warn('Clipboard copy error:', err);
+    }
+  });
+}
+
+// Periodic Heartbeat Ping & Presence Cleanup
+setInterval(() => {
+  if (client && client.connected) {
+    broadcast({
+      type: 'ping',
+      id: myId,
+      color: myColor
+    });
+  }
+  updateParticipantCount();
+}, 8000);
+
+// Notify other peers upon leaving
+window.addEventListener('beforeunload', () => {
+  broadcast({
+    type: 'leave',
+    id: myId
+  });
+});
+
+// Initial Tracking & Presence Boot
 startGeolocationTracking();
+updateParticipantCount();
+
 
 
