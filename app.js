@@ -28,12 +28,27 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// Automatic Room & Identity Resolution
-let roomId = window.location.hash.substring(1).trim();
-if (!roomId) {
-  roomId = 'stanza-' + Math.random().toString(36).substring(2, 8);
-  window.location.hash = roomId;
+function slugifyGroupName(name) {
+  return (name || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9àèéìòùáéíóú_-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'famiglia';
 }
+
+function formatGroupName(slug) {
+  if (!slug) return 'Famiglia';
+  return slug
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+// Group & Identity Resolution
+let rawHash = window.location.hash.substring(1).trim();
+let groupDisplayName = rawHash ? formatGroupName(rawHash) : 'Famiglia';
+let roomId = slugifyGroupName(rawHash || 'famiglia');
 
 const myId = 'user-' + Math.random().toString(36).substring(2, 9);
 const myColor = stringToColor(myId);
@@ -198,7 +213,9 @@ const toast = document.getElementById('toast');
 // E2EE Modal Elements
 const e2eeModal = document.getElementById('e2ee-modal');
 const e2eeForm = document.getElementById('e2ee-form');
+const groupNameInput = document.getElementById('group-name-input');
 const roomPasswordInput = document.getElementById('room-password-input');
+const initialUsernameInput = document.getElementById('initial-username-input');
 const togglePwdVisibilityBtn = document.getElementById('toggle-pwd-visibility-btn');
 const eyeIcon = document.getElementById('eye-icon');
 const unlockRoomBtn = document.getElementById('unlock-room-btn');
@@ -222,7 +239,7 @@ const closePrivacyBtn = document.getElementById('close-privacy-btn');
 const acceptPrivacyBtn = document.getElementById('accept-privacy-btn');
 
 if (roomNameDisplay) {
-  roomNameDisplay.textContent = roomId;
+  roomNameDisplay.textContent = `Gruppo: ${groupDisplayName}`;
 }
 if (selfColorDot) {
   selfColorDot.style.backgroundColor = myColor;
@@ -342,9 +359,17 @@ function openE2EEModal() {
   if (e2eeModal) {
     e2eeModal.classList.add('is-open');
     e2eeModal.setAttribute('aria-hidden', 'false');
+    if (groupNameInput) groupNameInput.value = groupDisplayName;
+    if (initialUsernameInput) initialUsernameInput.value = myName;
     if (roomPasswordInput) {
       roomPasswordInput.value = currentRoomPassword;
-      setTimeout(() => roomPasswordInput.focus(), 150);
+      setTimeout(() => {
+        if (!groupNameInput.value) {
+          groupNameInput.focus();
+        } else if (!roomPasswordInput.value) {
+          roomPasswordInput.focus();
+        }
+      }, 150);
     }
   }
 }
@@ -612,9 +637,9 @@ function syncPeerTrail(id, color, fullTrail, name) {
 
 // 📡 Real-Time Serverless Network (MQTT over WebSockets)
 const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
-const TOPIC_PREFIX = `geotrack_minimal_v1/${roomId}`;
-const MY_TOPIC = `${TOPIC_PREFIX}/${myId}`;
-const ROOM_WILDCARD = `${TOPIC_PREFIX}/+`;
+let TOPIC_PREFIX = `geotrack_minimal_v1/${roomId}`;
+let MY_TOPIC = `${TOPIC_PREFIX}/${myId}`;
+let ROOM_WILDCARD = `${TOPIC_PREFIX}/+`;
 
 const client = mqtt.connect(MQTT_BROKER, {
   clean: true,
@@ -1064,7 +1089,7 @@ if (shareRoomBtn) {
         document.body.removeChild(tempInput);
       }
       if (toast) {
-        toast.textContent = 'Link stanza copiato!';
+        toast.textContent = 'Link gruppo copiato!';
         toast.classList.add('show');
         setTimeout(() => toast.classList.remove('show'), 2200);
       }
@@ -1121,62 +1146,101 @@ if (togglePwdVisibilityBtn && roomPasswordInput && eyeIcon) {
   });
 }
 
-// Password Unlock Flow
-async function unlockWithPassword(pwd) {
+// Group Onboarding & Password Unlock Flow
+async function unlockWithCredentials(groupName, pwd, userName) {
+  groupName = (groupName || '').trim() || 'Famiglia';
   pwd = (pwd || '').trim();
+  userName = (userName || '').trim() || myName;
+
   if (!pwd) {
     if (roomPasswordInput) roomPasswordInput.focus();
     return;
   }
 
+  // Update user name
+  myName = userName;
+  localStorage.setItem('tracker_username', myName);
+
+  // Update group name and slug
+  groupDisplayName = groupName;
+  const newRoomId = slugifyGroupName(groupName);
+
+  if (newRoomId !== roomId && client && client.connected) {
+    client.unsubscribe(ROOM_WILDCARD);
+  }
+
+  roomId = newRoomId;
+  window.location.hash = roomId;
+
+  TOPIC_PREFIX = `geotrack_minimal_v1/${roomId}`;
+  MY_TOPIC = `${TOPIC_PREFIX}/${myId}`;
+  ROOM_WILDCARD = `${TOPIC_PREFIX}/+`;
+
   currentRoomPassword = pwd;
   sessionStorage.setItem(`e2ee_pwd_${roomId}`, pwd);
 
   // Derive AES-GCM 256 Key
-  e2eeCryptoKey = await deriveKeyFromPassword(pwd);
+  e2eeCryptoKey = await deriveKeyFromPassword(pwd, `geotrack_salt_v1_${roomId}`);
+
+  if (roomNameDisplay) {
+    roomNameDisplay.textContent = `Gruppo: ${groupDisplayName}`;
+  }
+
+  if (myMarker) {
+    myMarker.unbindTooltip();
+    myMarker.bindTooltip(`${escapeHtml(myName)} (Tu)`, { permanent: true, direction: 'top', offset: [0, -14] });
+  }
 
   closeE2EEModal();
 
   if (toast) {
-    toast.textContent = '🔐 Crittografia E2EE attivata!';
+    toast.textContent = `Gruppo "${groupDisplayName}" attivato!`;
     toast.classList.add('show');
     setTimeout(() => {
       toast.classList.remove('show');
-      toast.textContent = 'Link stanza copiato!';
+      toast.textContent = 'Link gruppo copiato!';
     }, 2200);
+  }
+
+  // Resubscribe with new room topic
+  if (client && client.connected) {
+    client.subscribe(ROOM_WILDCARD, (err) => {
+      if (!err) {
+        broadcast({
+          type: 'join',
+          id: myId,
+          name: myName,
+          color: myColor,
+          trail: myTrail,
+          tracking: isTracking
+        });
+      }
+    });
   }
 
   // Start tracking and join room
   startGeolocationTracking();
   updateParticipantCount();
+}
 
-  if (client.connected) {
-    broadcast({
-      type: 'join',
-      id: myId,
-      name: myName,
-      color: myColor,
-      trail: myTrail,
-      tracking: isTracking
-    });
-  }
+function handleOnboardingSubmit() {
+  const gName = groupNameInput ? groupNameInput.value : groupDisplayName;
+  const pwd = roomPasswordInput ? roomPasswordInput.value : '';
+  const uName = initialUsernameInput ? initialUsernameInput.value : myName;
+  unlockWithCredentials(gName, pwd, uName);
 }
 
 if (e2eeForm) {
   e2eeForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (roomPasswordInput) {
-      unlockWithPassword(roomPasswordInput.value);
-    }
+    handleOnboardingSubmit();
   });
 }
 
 if (unlockRoomBtn) {
   unlockRoomBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    if (roomPasswordInput) {
-      unlockWithPassword(roomPasswordInput.value);
-    }
+    handleOnboardingSubmit();
   });
 }
 
@@ -1207,7 +1271,7 @@ window.addEventListener('beforeunload', () => {
 // Initial Session Startup
 async function initSession() {
   if (currentRoomPassword) {
-    e2eeCryptoKey = await deriveKeyFromPassword(currentRoomPassword);
+    e2eeCryptoKey = await deriveKeyFromPassword(currentRoomPassword, `geotrack_salt_v1_${roomId}`);
     startGeolocationTracking();
     updateParticipantCount();
   } else {

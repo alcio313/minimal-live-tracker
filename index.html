@@ -52,48 +52,59 @@
     <div id="toast" class="toast">Link stanza copiato!</div>
   </div>
 
-  <!-- Initial Session Start: E2EE Password Modal -->
+  <!-- Initial Session Start: Group Name & Password Modal -->
   <div id="e2ee-modal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-card e2ee-card">
       <div class="modal-header">
         <div class="modal-title-group">
           <div class="e2ee-shield-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
               <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
             </svg>
           </div>
           <div>
-            <h3>Crittografia End-to-End</h3>
-            <div class="modal-subtitle">Protezione AES-256 attiva</div>
+            <h3>Accedi al Gruppo</h3>
+            <div class="modal-subtitle">Tracciamento Mappa Protetto</div>
           </div>
         </div>
       </div>
 
       <div class="e2ee-body">
         <p class="e2ee-description">
-          Tutti i dati di posizione GPS, le tracce e i nomi utente sono protetti con cifratura <strong>AES-GCM a 256 bit</strong>. Inserisci la password per partecipare alla stanza.
+          Scegli o inserisci il nome del gruppo e la password per condividere la posizione in tempo reale con i tuoi cari.
         </p>
 
         <form id="e2ee-form" onsubmit="return false;">
           <div class="form-group">
-            <label for="room-password-input" class="section-label">Password della Stanza</label>
+            <label for="group-name-input" class="section-label">Nome del Gruppo</label>
+            <input type="text" id="group-name-input" class="name-input" placeholder="Es. Famiglia, Trekking, Gita..." autocomplete="off" required>
+            <span class="password-hint">Tutti i membri dello stesso gruppo devono inserire lo stesso nome.</span>
+          </div>
+
+          <div class="form-group" style="margin-top: 14px;">
+            <label for="room-password-input" class="section-label">Password del Gruppo</label>
             <div class="password-input-wrapper">
-              <input type="password" id="room-password-input" class="name-input password-input" placeholder="Crea o inserisci la password..." autocomplete="current-password" required>
+              <input type="password" id="room-password-input" class="name-input password-input" placeholder="Parola d'ordine di sicurezza..." autocomplete="current-password" required>
               <button type="button" id="toggle-pwd-visibility-btn" class="toggle-pwd-btn" title="Mostra/Nascondi password" aria-label="Mostra password">
-                <svg id="eye-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg id="eye-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                   <circle cx="12" cy="12" r="3"></circle>
                 </svg>
               </button>
             </div>
-            <span class="password-hint">Tutti i partecipanti alla stanza devono usare la stessa password per vedersi.</span>
+            <span class="password-hint">Solo chi usa la stessa password può vedere le posizioni.</span>
+          </div>
+
+          <div class="form-group" style="margin-top: 14px;">
+            <label for="initial-username-input" class="section-label">Il tuo Nome</label>
+            <input type="text" id="initial-username-input" class="name-input" placeholder="Es. Nonno Giorgio, Marco..." autocomplete="off" required>
           </div>
 
           <button type="submit" id="unlock-room-btn" class="save-name-btn unlock-btn">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-              <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
             </svg>
-            <span>Sblocca ed Entra nella Stanza</span>
+            <span>ENTRA NEL GRUPPO</span>
           </button>
         </form>
       </div>
@@ -108,7 +119,7 @@
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" class="modal-title-icon">
             <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
           </svg>
-          <h3>Partecipanti Stanza</h3>
+          <h3>Membri del Gruppo</h3>
         </div>
         <button id="close-modal-btn" class="close-btn" aria-label="Chiudi elenco partecipanti">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
