@@ -19,6 +19,15 @@ function stringToColor(str) {
   return PALETTE[index];
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 // Automatic Room & Identity Resolution
 let roomId = window.location.hash.substring(1).trim();
 if (!roomId) {
@@ -28,6 +37,9 @@ if (!roomId) {
 
 const myId = 'user-' + Math.random().toString(36).substring(2, 9);
 const myColor = stringToColor(myId);
+
+// User Custom Display Name
+let myName = localStorage.getItem('tracker_username') || `Utente-${myId.substring(5, 9)}`;
 
 // Initialize Leaflet Map (Fullscreen, Clear Standard Theme)
 const map = L.map('map', {
@@ -55,31 +67,161 @@ let simLat = 41.9028;
 let simLng = 12.4964;
 let simAngle = Math.random() * Math.PI * 2;
 
-// Peer Store: peerId -> { color, trail: [[lat, lng]], marker, polyline, isPaused }
+// Peer Store: peerId -> { name, color, trail: [[lat, lng]], marker, polyline, isPaused, lastSeen }
 const peers = new Map();
 
-// UI References
+// UI Elements
 const roomNameDisplay = document.getElementById('room-name-display');
 const userCountText = document.getElementById('user-count-text');
 const roomBadge = document.getElementById('room-badge');
 const toast = document.getElementById('toast');
 
+// Modal UI Elements
+const participantsModal = document.getElementById('participants-modal');
+const closeModalBtn = document.getElementById('close-modal-btn');
+const usernameInput = document.getElementById('username-input');
+const saveNameBtn = document.getElementById('save-name-btn');
+const selfColorDot = document.getElementById('self-color-dot');
+const modalCountBadge = document.getElementById('modal-count-badge');
+const participantsList = document.getElementById('participants-list');
+const shareRoomBtn = document.getElementById('share-room-btn');
+
 if (roomNameDisplay) {
   roomNameDisplay.textContent = roomId;
 }
+if (selfColorDot) {
+  selfColorDot.style.backgroundColor = myColor;
+}
 
-// Update Active Participants Counter
-function updateParticipantCount() {
-  if (!userCountText) return;
+// Render Participants List in Modal
+function renderParticipantsList() {
   const now = Date.now();
   let activePeers = 0;
-  for (const [id, peer] of peers.entries()) {
-    if (now - (peer.lastSeen || 0) < 25000) {
-      activePeers++;
+
+  if (participantsList) {
+    participantsList.innerHTML = '';
+
+    // 1. Add Self
+    const selfItem = document.createElement('div');
+    selfItem.className = 'participant-item';
+    selfItem.innerHTML = `
+      <div class="participant-main">
+        <div class="participant-avatar" style="background-color: ${myColor}; box-shadow: 0 0 8px ${myColor}"></div>
+        <div>
+          <span class="participant-name-text">${escapeHtml(myName)}</span>
+          <span class="participant-is-you">Tu</span>
+        </div>
+      </div>
+      <div class="participant-status-indicator ${isTracking ? '' : 'is-paused'}">
+        <span class="participant-status-dot"></span>
+        <span>${isTracking ? 'In tracking' : 'In pausa'}</span>
+      </div>
+    `;
+    selfItem.addEventListener('click', () => {
+      recenterMap();
+      closeParticipantsModal();
+    });
+    participantsList.appendChild(selfItem);
+
+    // 2. Add Active Peers
+    for (const [id, peer] of peers.entries()) {
+      if (now - (peer.lastSeen || 0) < 25000) {
+        activePeers++;
+        const peerItem = document.createElement('div');
+        peerItem.className = 'participant-item';
+        const peerName = peer.name || `Utente-${id.substring(5, 9)}`;
+        const isPaused = peer.isPaused || false;
+        peerItem.innerHTML = `
+          <div class="participant-main">
+            <div class="participant-avatar" style="background-color: ${peer.color}; box-shadow: 0 0 8px ${peer.color}"></div>
+            <span class="participant-name-text">${escapeHtml(peerName)}</span>
+          </div>
+          <div class="participant-status-indicator ${isPaused ? 'is-paused' : ''}">
+            <span class="participant-status-dot"></span>
+            <span>${isPaused ? 'In pausa' : 'In tracking'}</span>
+          </div>
+        `;
+        peerItem.addEventListener('click', () => {
+          if (peer.marker) {
+            map.flyTo(peer.marker.getLatLng(), Math.max(map.getZoom(), 16), { duration: 0.8 });
+            closeParticipantsModal();
+          }
+        });
+        participantsList.appendChild(peerItem);
+      }
+    }
+  } else {
+    for (const [id, peer] of peers.entries()) {
+      if (now - (peer.lastSeen || 0) < 25000) {
+        activePeers++;
+      }
     }
   }
+
   const total = 1 + activePeers;
-  userCountText.textContent = total === 1 ? '1 online' : `${total} online`;
+  if (userCountText) {
+    userCountText.textContent = total === 1 ? '1 online' : `${total} online`;
+  }
+  if (modalCountBadge) {
+    modalCountBadge.textContent = `${total} online`;
+  }
+}
+
+function updateParticipantCount() {
+  renderParticipantsList();
+}
+
+// Modal Control
+function openParticipantsModal() {
+  if (participantsModal) {
+    if (usernameInput) usernameInput.value = myName;
+    if (selfColorDot) selfColorDot.style.backgroundColor = myColor;
+    renderParticipantsList();
+    participantsModal.classList.add('is-open');
+    participantsModal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function closeParticipantsModal() {
+  if (participantsModal) {
+    participantsModal.classList.remove('is-open');
+    participantsModal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+// Save Custom Name
+function saveCustomName() {
+  if (!usernameInput) return;
+  const newName = usernameInput.value.trim();
+  if (newName && newName !== myName) {
+    myName = newName;
+    localStorage.setItem('tracker_username', myName);
+
+    // Update self marker tooltip
+    if (myMarker) {
+      myMarker.unbindTooltip();
+      myMarker.bindTooltip(`${escapeHtml(myName)} (Tu)`, { permanent: false, direction: 'top', offset: [0, -10] });
+    }
+
+    // Broadcast name update to room
+    broadcast({
+      type: 'name',
+      id: myId,
+      name: myName,
+      color: myColor
+    });
+
+    renderParticipantsList();
+
+    if (toast) {
+      toast.textContent = `Nome aggiornato: ${myName}`;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+        toast.textContent = 'Link stanza copiato!';
+      }, 2000);
+    }
+  }
 }
 
 // Helper: Create custom animated radar marker
@@ -119,6 +261,7 @@ function updateMyPosition(lat, lng) {
       icon: createMarkerIcon(myColor, true),
       zIndexOffset: 1000
     }).addTo(map);
+    myMarker.bindTooltip(`${escapeHtml(myName)} (Tu)`, { permanent: false, direction: 'top', offset: [0, -10] });
   } else {
     myMarker.setLatLng(coord);
   }
@@ -147,6 +290,7 @@ function updateMyPosition(lat, lng) {
   broadcast({
     type: 'pos',
     id: myId,
+    name: myName,
     color: myColor,
     coord: coord,
     time: Date.now()
@@ -154,12 +298,13 @@ function updateMyPosition(lat, lng) {
 }
 
 // Update or Create Peer Position & Past Trail
-function updatePeerPosition(id, color, coord) {
+function updatePeerPosition(id, color, coord, name) {
   if (id === myId) return;
 
   let peer = peers.get(id);
   if (!peer) {
     peer = {
+      name: name || `Utente-${id.substring(5, 9)}`,
       color: color || stringToColor(id),
       trail: [],
       marker: null,
@@ -170,6 +315,7 @@ function updatePeerPosition(id, color, coord) {
     peers.set(id, peer);
   } else {
     peer.lastSeen = Date.now();
+    if (name) peer.name = name;
   }
 
   peer.trail.push(coord);
@@ -180,8 +326,12 @@ function updatePeerPosition(id, color, coord) {
       icon: createMarkerIcon(peer.color, false),
       zIndexOffset: 500
     }).addTo(map);
+    peer.marker.bindTooltip(escapeHtml(peer.name), { permanent: false, direction: 'top', offset: [0, -10] });
   } else {
     peer.marker.setLatLng(coord);
+    if (name) {
+      peer.marker.setTooltipContent(escapeHtml(name));
+    }
   }
 
   // Update or create peer polyline
@@ -200,12 +350,13 @@ function updatePeerPosition(id, color, coord) {
 }
 
 // Synchronize Full Past Trail for a Peer
-function syncPeerTrail(id, color, fullTrail) {
+function syncPeerTrail(id, color, fullTrail, name) {
   if (id === myId || !Array.isArray(fullTrail) || fullTrail.length === 0) return;
 
   let peer = peers.get(id);
   if (!peer) {
     peer = {
+      name: name || `Utente-${id.substring(5, 9)}`,
       color: color || stringToColor(id),
       trail: [],
       marker: null,
@@ -216,6 +367,7 @@ function syncPeerTrail(id, color, fullTrail) {
     peers.set(id, peer);
   } else {
     peer.lastSeen = Date.now();
+    if (name) peer.name = name;
   }
 
   peer.trail = fullTrail;
@@ -226,8 +378,12 @@ function syncPeerTrail(id, color, fullTrail) {
       icon: createMarkerIcon(peer.color, false),
       zIndexOffset: 500
     }).addTo(map);
+    peer.marker.bindTooltip(escapeHtml(peer.name), { permanent: false, direction: 'top', offset: [0, -10] });
   } else {
     peer.marker.setLatLng(lastCoord);
+    if (name) {
+      peer.marker.setTooltipContent(escapeHtml(name));
+    }
   }
 
   if (!peer.polyline) {
@@ -269,6 +425,7 @@ client.on('connect', () => {
       broadcast({
         type: 'join',
         id: myId,
+        name: myName,
         color: myColor,
         trail: myTrail,
         tracking: isTracking
@@ -285,16 +442,23 @@ client.on('message', (topic, message) => {
     let peer = peers.get(data.id);
     if (peer) {
       peer.lastSeen = Date.now();
+      if (data.name) {
+        peer.name = data.name;
+        if (peer.marker) {
+          peer.marker.setTooltipContent(escapeHtml(data.name));
+        }
+      }
     }
 
     if (data.type === 'join') {
       if (!peer) {
         peer = {
+          name: data.name || `Utente-${data.id.substring(5, 9)}`,
           color: data.color || stringToColor(data.id),
           trail: [],
           marker: null,
           polyline: null,
-          isPaused: false,
+          isPaused: (data.tracking === false),
           lastSeen: Date.now()
         };
         peers.set(data.id, peer);
@@ -303,24 +467,26 @@ client.on('message', (topic, message) => {
         broadcast({
           type: 'sync',
           id: myId,
+          name: myName,
           color: myColor,
           trail: myTrail,
           tracking: isTracking
         });
       }
       if (data.trail && data.trail.length > 0) {
-        syncPeerTrail(data.id, data.color, data.trail);
+        syncPeerTrail(data.id, data.color, data.trail, data.name);
       }
       updateParticipantCount();
     } else if (data.type === 'sync') {
-      syncPeerTrail(data.id, data.color, data.trail);
+      syncPeerTrail(data.id, data.color, data.trail, data.name);
       updateParticipantCount();
     } else if (data.type === 'pos' && data.coord) {
-      updatePeerPosition(data.id, data.color, data.coord);
+      updatePeerPosition(data.id, data.color, data.coord, data.name);
       updateParticipantCount();
-    } else if (data.type === 'ping') {
+    } else if (data.type === 'name' && data.name) {
       if (!peer) {
         peer = {
+          name: data.name,
           color: data.color || stringToColor(data.id),
           trail: [],
           marker: null,
@@ -329,8 +495,30 @@ client.on('message', (topic, message) => {
           lastSeen: Date.now()
         };
         peers.set(data.id, peer);
+      } else {
+        peer.name = data.name;
+        if (peer.marker) {
+          peer.marker.setTooltipContent(escapeHtml(data.name));
+        }
+      }
+      updateParticipantCount();
+    } else if (data.type === 'ping') {
+      if (!peer) {
+        peer = {
+          name: data.name || `Utente-${data.id.substring(5, 9)}`,
+          color: data.color || stringToColor(data.id),
+          trail: [],
+          marker: null,
+          polyline: null,
+          isPaused: (data.tracking === false),
+          lastSeen: Date.now()
+        };
+        peers.set(data.id, peer);
       }
       peer.lastSeen = Date.now();
+      if (data.tracking !== undefined) {
+        peer.isPaused = (data.tracking === false);
+      }
       updateParticipantCount();
     } else if (data.type === 'leave') {
       if (peers.has(data.id)) {
@@ -342,13 +530,16 @@ client.on('message', (topic, message) => {
         updateParticipantCount();
       }
     } else if (data.type === 'status') {
-      if (peer && peer.marker) {
-        const el = peer.marker.getElement();
-        if (el) {
-          if (data.tracking === false) {
-            el.classList.add('is-paused');
-          } else {
-            el.classList.remove('is-paused');
+      if (peer) {
+        peer.isPaused = (data.tracking === false);
+        if (peer.marker) {
+          const el = peer.marker.getElement();
+          if (el) {
+            if (data.tracking === false) {
+              el.classList.add('is-paused');
+            } else {
+              el.classList.remove('is-paused');
+            }
           }
         }
       }
@@ -445,6 +636,7 @@ function updateTrackingButtonUI() {
       myMarker.getElement().classList.add('is-paused');
     }
   }
+  renderParticipantsList();
 }
 
 if (toggleBtn) {
@@ -463,6 +655,7 @@ if (toggleBtn) {
     broadcast({
       type: 'status',
       id: myId,
+      name: myName,
       tracking: isTracking
     });
   });
@@ -506,9 +699,42 @@ if (recenterBtn) {
   });
 }
 
-// Room Link Copy Action
+// Open Participants Modal on Badge / Count Click
 if (roomBadge) {
-  roomBadge.addEventListener('click', async () => {
+  roomBadge.addEventListener('click', () => {
+    openParticipantsModal();
+  });
+}
+
+// Close Modal Events
+if (closeModalBtn) {
+  closeModalBtn.addEventListener('click', closeParticipantsModal);
+}
+
+if (participantsModal) {
+  participantsModal.addEventListener('click', (e) => {
+    if (e.target === participantsModal) {
+      closeParticipantsModal();
+    }
+  });
+}
+
+// Save Custom Name Actions
+if (saveNameBtn) {
+  saveNameBtn.addEventListener('click', saveCustomName);
+}
+
+if (usernameInput) {
+  usernameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      saveCustomName();
+    }
+  });
+}
+
+// Share Room Button inside Modal
+if (shareRoomBtn) {
+  shareRoomBtn.addEventListener('click', async () => {
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(window.location.href);
@@ -521,6 +747,7 @@ if (roomBadge) {
         document.body.removeChild(tempInput);
       }
       if (toast) {
+        toast.textContent = 'Link stanza copiato!';
         toast.classList.add('show');
         setTimeout(() => toast.classList.remove('show'), 2200);
       }
@@ -536,7 +763,9 @@ setInterval(() => {
     broadcast({
       type: 'ping',
       id: myId,
-      color: myColor
+      name: myName,
+      color: myColor,
+      tracking: isTracking
     });
   }
   updateParticipantCount();
@@ -553,6 +782,7 @@ window.addEventListener('beforeunload', () => {
 // Initial Tracking & Presence Boot
 startGeolocationTracking();
 updateParticipantCount();
+
 
 
 
