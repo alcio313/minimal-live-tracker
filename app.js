@@ -78,7 +78,7 @@ function updateMyPosition(lat, lng) {
   if (!isTracking) return;
 
   const coord = [lat, lng];
-  
+
   // Ignore duplicate consecutive points
   if (myTrail.length > 0) {
     const last = myTrail[myTrail.length - 1];
@@ -363,7 +363,7 @@ function updateTrackingButtonUI() {
     }
   } else {
     toggleBtn.className = 'tracking-btn tracking-paused';
-    btnText.textContent = 'Riprendi Tracking';
+    btnText.textContent = 'START Tracking';
     btnIcon.innerHTML = `
       <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
         <polygon points="6,4 20,12 6,20" />
@@ -378,7 +378,7 @@ function updateTrackingButtonUI() {
 if (toggleBtn) {
   toggleBtn.addEventListener('click', () => {
     isTracking = !isTracking;
-    
+
     if (isTracking) {
       startGeolocationTracking();
     } else {
@@ -396,6 +396,45 @@ if (toggleBtn) {
   });
 }
 
+// Recenter Map on User Location
+const recenterBtn = document.getElementById('recenter-btn');
+
+function recenterMap() {
+  if (myMarker) {
+    const coord = myMarker.getLatLng();
+    map.flyTo(coord, Math.max(map.getZoom(), 16), {
+      duration: 0.8,
+      easeLinearity: 0.25
+    });
+  } else if (myTrail.length > 0) {
+    const lastCoord = myTrail[myTrail.length - 1];
+    map.flyTo(lastCoord, Math.max(map.getZoom(), 16), {
+      duration: 0.8,
+      easeLinearity: 0.25
+    });
+  } else if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coord = [pos.coords.latitude, pos.coords.longitude];
+        updateMyPosition(coord[0], coord[1]);
+        map.flyTo(coord, 16, { duration: 0.8 });
+      },
+      (err) => {
+        console.warn('Geolocation notice during recenter:', err);
+        map.flyTo([simLat, simLng], 16, { duration: 0.8 });
+      },
+      { enableHighAccuracy: true, timeout: 5000 }
+    );
+  }
+}
+
+if (recenterBtn) {
+  recenterBtn.addEventListener('click', () => {
+    recenterMap();
+  });
+}
+
 // Initial Tracking Boot
 startGeolocationTracking();
+
 
