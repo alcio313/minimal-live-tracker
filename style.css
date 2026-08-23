@@ -640,10 +640,118 @@ html, body {
   transform: scale(0.99);
 }
 
+.privacy-text-link {
+  display: block;
+  width: 100%;
+  text-align: center;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 10px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.2s ease;
+}
+
+.privacy-text-link:hover {
+  color: #2563eb;
+}
+
+/* Top Right Privacy Button */
+.top-right-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.privacy-badge-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #475569;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 25px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.03);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+}
+
+.privacy-badge-btn:hover {
+  transform: translateY(-2px);
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 14px 28px -4px rgba(15, 23, 42, 0.14), 0 6px 10px -2px rgba(15, 23, 42, 0.05);
+}
+
+.privacy-badge-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Privacy Modal Content */
+.privacy-card {
+  max-width: 480px;
+}
+
+.privacy-content {
+  padding: 18px 22px;
+  max-height: 380px;
+  overflow-y: auto;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.55;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.privacy-section h4 {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 5px;
+}
+
+.privacy-section p {
+  margin-bottom: 6px;
+}
+
+.privacy-section ul {
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.privacy-section strong {
+  color: #0f172a;
+}
+
 @media (max-width: 600px) {
   .top-bar-container {
     top: 14px;
     left: 14px;
+  }
+  .top-right-container {
+    top: 14px;
+    right: 14px;
+  }
+  .privacy-badge-btn {
+    padding: 7px 11px;
+    font-size: 12px;
   }
   .room-badge {
     padding: 7px 13px;
@@ -666,7 +774,11 @@ html, body {
     border-radius: 20px;
     max-width: 92vw;
   }
+  .privacy-content {
+    max-height: 60vh;
+  }
 }
+
 
 
 

@@ -779,9 +779,58 @@ window.addEventListener('beforeunload', () => {
   });
 });
 
+// Privacy Policy Modal Handling
+const privacyBtn = document.getElementById('privacy-btn');
+const modalPrivacyLinkBtn = document.getElementById('modal-privacy-link-btn');
+const privacyModal = document.getElementById('privacy-modal');
+const closePrivacyBtn = document.getElementById('close-privacy-btn');
+const acceptPrivacyBtn = document.getElementById('accept-privacy-btn');
+
+function openPrivacyModal() {
+  if (privacyModal) {
+    privacyModal.classList.add('is-open');
+    privacyModal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function closePrivacyModal() {
+  if (privacyModal) {
+    privacyModal.classList.remove('is-open');
+    privacyModal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+if (privacyBtn) {
+  privacyBtn.addEventListener('click', openPrivacyModal);
+}
+
+if (modalPrivacyLinkBtn) {
+  modalPrivacyLinkBtn.addEventListener('click', () => {
+    closeParticipantsModal();
+    openPrivacyModal();
+  });
+}
+
+if (closePrivacyBtn) {
+  closePrivacyBtn.addEventListener('click', closePrivacyModal);
+}
+
+if (acceptPrivacyBtn) {
+  acceptPrivacyBtn.addEventListener('click', closePrivacyModal);
+}
+
+if (privacyModal) {
+  privacyModal.addEventListener('click', (e) => {
+    if (e.target === privacyModal) {
+      closePrivacyModal();
+    }
+  });
+}
+
 // Initial Tracking & Presence Boot
 startGeolocationTracking();
 updateParticipantCount();
+
 
 
 
