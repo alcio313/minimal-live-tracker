@@ -1362,8 +1362,14 @@ window.addEventListener('online', () => {
     }, 3000);
   }
   if (myTrail.length > 0 && e2eeCryptoKey) {
-    const latestPos = myTrail[myTrail.length - 1];
-    broadcastPosition(latestPos[0], latestPos[1]);
+    broadcast({
+      type: 'sync',
+      id: myId,
+      name: myName,
+      color: myColor,
+      trail: myTrail,
+      tracking: isTracking
+    });
   }
 });
 
