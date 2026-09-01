@@ -163,7 +163,9 @@ const map = L.map('map', {
   fadeAnimation: true
 }).setView([41.9028, 12.4964], 15);
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+const CARTO_API_KEY = 'cb1_2q8y_1_e3a6bfaec866fa48bee47025';
+
+L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`, {
   maxZoom: 20,
   subdomains: 'abcd'
 }).addTo(map);
