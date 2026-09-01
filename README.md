@@ -27,6 +27,9 @@ Una web application ultra-minimale, accessibile e moderna per il tracciamento GP
   - Nessun database centrale, dati volatili che svaniscono alla chiusura.
   - Zero cookie di tracciamento o profilazione.
   - Informativa sulla privacy trasparente integrata.
+- 📱 **Progressive Web App (PWA) & Supporto Offline**:
+  - Installabile su smartphone (Android/iOS) con icona dedicata a schermo intero senza barre del browser.
+  - Funzionamento autonomo anche senza copertura di rete: cache locale di app e porzioni di mappa già visualizzate, con antenna GPS sempre attiva.
 - 🗺️ **Mappe Chiare Standard**: Tile ad alto contrasto CartoDB Voyager su Leaflet.js.
 - ⚡ **Rete Real-Time Serverless**: Sincronizzazione istantanea P2P-like tramite protocollo MQTT over WebSockets.
 

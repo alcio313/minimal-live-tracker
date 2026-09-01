@@ -1281,6 +1281,92 @@ async function initSession() {
   }
 }
 
+// ==========================================
+// 📱 PWA Install & Offline Status Support
+// ==========================================
+let deferredInstallPrompt = null;
+const modalInstallPwaBtn = document.getElementById('modal-install-pwa-btn');
+const onlineIndicator = document.querySelector('.online-indicator');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (modalInstallPwaBtn) {
+    modalInstallPwaBtn.style.display = 'flex';
+  }
+});
+
+if (modalInstallPwaBtn) {
+  modalInstallPwaBtn.addEventListener('click', async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') {
+        modalInstallPwaBtn.style.display = 'none';
+      }
+      deferredInstallPrompt = null;
+    } else {
+      if (toast) {
+        toast.textContent = 'Aggiungi l\'app dal menu Condividi (iOS) o dalle impostazioni del browser';
+        toast.classList.add('show');
+        setTimeout(() => {
+          toast.classList.remove('show');
+          toast.textContent = 'Link gruppo copiato!';
+        }, 3500);
+      }
+    }
+  });
+}
+
+window.addEventListener('appinstalled', () => {
+  if (modalInstallPwaBtn) {
+    modalInstallPwaBtn.style.display = 'none';
+  }
+  if (toast) {
+    toast.textContent = '✅ App installata con successo!';
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+      toast.textContent = 'Link gruppo copiato!';
+    }, 2500);
+  }
+});
+
+// Network Connectivity Listeners (Online / Offline)
+window.addEventListener('offline', () => {
+  if (onlineIndicator) {
+    onlineIndicator.classList.add('is-offline');
+    onlineIndicator.title = 'Offline (GPS locale attivo)';
+  }
+  if (toast) {
+    toast.textContent = '📡 Modalità Offline: GPS attivo (sincronizzazione in pausa)';
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+      toast.textContent = 'Link gruppo copiato!';
+    }, 3500);
+  }
+});
+
+window.addEventListener('online', () => {
+  if (onlineIndicator) {
+    onlineIndicator.classList.remove('is-offline');
+    onlineIndicator.title = 'Online';
+  }
+  if (toast) {
+    toast.textContent = '🟢 Connessione ripristinata: sincronizzazione attiva';
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+      toast.textContent = 'Link gruppo copiato!';
+    }, 3000);
+  }
+  if (myTrail.length > 0 && e2eeCryptoKey) {
+    const latestPos = myTrail[myTrail.length - 1];
+    broadcastPosition(latestPos[0], latestPos[1]);
+  }
+});
+
 initSession();
 
 
