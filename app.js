@@ -45,10 +45,65 @@ function formatGroupName(slug) {
     .join(' ');
 }
 
+// Parse URL Invite Parameters (supports #group=...&pwd=...&carto_key=... or query params)
+function parseUrlInviteParams() {
+  const result = {
+    group: '',
+    pwd: '',
+    cartoKey: '',
+    fromInvite: false
+  };
+
+  try {
+    // 1. URL Query Parameters (?group=...&pwd=...&carto_key=...)
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.has('group')) result.group = searchParams.get('group').trim();
+    if (searchParams.has('pwd')) result.pwd = searchParams.get('pwd').trim();
+    if (searchParams.has('password')) result.pwd = searchParams.get('password').trim();
+    if (searchParams.has('carto_key')) result.cartoKey = searchParams.get('carto_key').trim();
+    if (searchParams.has('keyapi')) result.cartoKey = searchParams.get('keyapi').trim();
+
+    // 2. URL Hash Fragment (#group=...&pwd=... or #slug?pwd=... or #slug)
+    let rawHash = window.location.hash.substring(1).trim();
+    if (rawHash) {
+      if (rawHash.includes('=') || rawHash.includes('&') || rawHash.includes('?')) {
+        let hashQuery = rawHash;
+        if (rawHash.includes('?')) {
+          const parts = rawHash.split('?');
+          if (!result.group && parts[0]) {
+            result.group = formatGroupName(parts[0]);
+          }
+          hashQuery = parts[1];
+        }
+        const hashParams = new URLSearchParams(hashQuery);
+        if (hashParams.has('group') && !result.group) result.group = hashParams.get('group').trim();
+        if (hashParams.has('pwd') && !result.pwd) result.pwd = hashParams.get('pwd').trim();
+        if (hashParams.has('password') && !result.pwd) result.pwd = hashParams.get('password').trim();
+        if (hashParams.has('carto_key') && !result.cartoKey) result.cartoKey = hashParams.get('carto_key').trim();
+        if (hashParams.has('keyapi') && !result.cartoKey) result.cartoKey = hashParams.get('keyapi').trim();
+      } else {
+        // Simple slug in hash (e.g. #monte-bianco)
+        if (!result.group) {
+          result.group = formatGroupName(rawHash);
+        }
+      }
+    }
+
+    if (result.pwd || (result.group && result.group.toLowerCase() !== 'volantini x')) {
+      result.fromInvite = true;
+    }
+  } catch (e) {
+    console.warn('Could not parse invite parameters from URL:', e);
+  }
+
+  return result;
+}
+
+const inviteParams = parseUrlInviteParams();
+
 // Group & Identity Resolution
-let rawHash = window.location.hash.substring(1).trim();
-let groupDisplayName = rawHash ? formatGroupName(rawHash) : 'Volantini X';
-let roomId = slugifyGroupName(rawHash || 'volantini-x');
+let groupDisplayName = inviteParams.group || 'Volantini X';
+let roomId = slugifyGroupName(groupDisplayName);
 
 const myId = 'user-' + Math.random().toString(36).substring(2, 9);
 const myColor = stringToColor(myId);
@@ -56,11 +111,19 @@ const myColor = stringToColor(myId);
 // User Custom Display Name
 let myName = localStorage.getItem('tracker_username') || `Utente-${myId.substring(5, 9)}`;
 
+// If invite link included a CARTO key, automatically store it for seamless map loading
+if (inviteParams.cartoKey) {
+  localStorage.setItem('carto_api_key', inviteParams.cartoKey);
+}
+
 // ==========================================
 // 🔐 End-to-End Encryption (E2EE) WebCrypto
 // ==========================================
 let e2eeCryptoKey = null;
-let currentRoomPassword = sessionStorage.getItem(`e2ee_pwd_${roomId}`) || '';
+let currentRoomPassword = inviteParams.pwd || sessionStorage.getItem(`e2ee_pwd_${roomId}`) || '';
+if (currentRoomPassword) {
+  sessionStorage.setItem(`e2ee_pwd_${roomId}`, currentRoomPassword);
+}
 
 async function deriveKeyFromPassword(password, roomSalt) {
   const enc = new TextEncoder();
@@ -469,14 +532,32 @@ function openE2EEModal() {
     if (initialUsernameInput) initialUsernameInput.value = myName;
     if (roomPasswordInput) {
       roomPasswordInput.value = currentRoomPassword;
-      setTimeout(() => {
-        if (!groupNameInput.value) {
-          groupNameInput.focus();
-        } else if (!roomPasswordInput.value) {
-          roomPasswordInput.focus();
-        }
-      }, 150);
     }
+
+    const inviteBanner = document.getElementById('invite-link-banner');
+    if (inviteBanner) {
+      if (inviteParams.fromInvite && currentRoomPassword) {
+        inviteBanner.style.display = 'flex';
+      } else {
+        inviteBanner.style.display = 'none';
+      }
+    }
+
+    setTimeout(() => {
+      // If group and password arrived via invite link, focus directly on the username input!
+      if (inviteParams.fromInvite && currentRoomPassword) {
+        if (initialUsernameInput) {
+          initialUsernameInput.focus();
+          initialUsernameInput.select();
+        }
+      } else if (groupNameInput && !groupNameInput.value) {
+        groupNameInput.focus();
+      } else if (roomPasswordInput && !roomPasswordInput.value) {
+        roomPasswordInput.focus();
+      } else if (initialUsernameInput) {
+        initialUsernameInput.focus();
+      }
+    }, 150);
   }
 }
 
@@ -1226,25 +1307,62 @@ if (usernameInput) {
   });
 }
 
-// Share Room Button inside Modal
+// Share Room / Invite Link Generation
+function generateInviteUrl(includePassword = true, includeCartoKey = true) {
+  const base = window.location.origin + window.location.pathname;
+  if (!includePassword && !includeCartoKey) {
+    return `${base}#${roomId}`;
+  }
+
+  const hashParams = new URLSearchParams();
+  if (groupDisplayName) {
+    hashParams.set('group', groupDisplayName);
+  }
+  if (includePassword && currentRoomPassword) {
+    hashParams.set('pwd', currentRoomPassword);
+  }
+  const cartoKey = getCartoApiKey();
+  if (includeCartoKey && cartoKey) {
+    hashParams.set('carto_key', cartoKey);
+  }
+
+  // Storing parameters in the hash fragment prevents them from being sent to HTTP servers
+  return `${base}#${hashParams.toString()}`;
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+  } else {
+    const tempInput = document.createElement('input');
+    tempInput.value = text;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    document.execCommand('copy');
+    document.body.removeChild(tempInput);
+  }
+}
+
+// Share Room Button inside Modal (Full Invite with password and map key)
 if (shareRoomBtn) {
   shareRoomBtn.addEventListener('click', async () => {
     try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(window.location.href);
-      } else {
-        const tempInput = document.createElement('input');
-        tempInput.value = window.location.href;
-        document.body.appendChild(tempInput);
-        tempInput.select();
-        document.execCommand('copy');
-        document.body.removeChild(tempInput);
-      }
-      if (toast) {
-        toast.textContent = 'Link gruppo copiato!';
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 2200);
-      }
+      const inviteUrl = generateInviteUrl(true, true);
+      await copyTextToClipboard(inviteUrl);
+      showToast('✅ Link invito copiato! (Include gruppo, password e mappa)', 3000);
+    } catch (err) {
+      console.warn('Clipboard copy error:', err);
+    }
+  });
+}
+
+const shareRoomPlainBtn = document.getElementById('share-room-plain-btn');
+if (shareRoomPlainBtn) {
+  shareRoomPlainBtn.addEventListener('click', async () => {
+    try {
+      const plainUrl = generateInviteUrl(false, false);
+      await copyTextToClipboard(plainUrl);
+      showToast('Link stanza copiato (senza password)', 2200);
     } catch (err) {
       console.warn('Clipboard copy error:', err);
     }
@@ -1398,7 +1516,11 @@ async function unlockWithCredentials(groupName, pwd, userName) {
   }
 
   roomId = newRoomId;
-  window.location.hash = roomId;
+  if (window.history && window.history.replaceState) {
+    window.history.replaceState(null, '', `${window.location.pathname}#${roomId}`);
+  } else {
+    window.location.hash = roomId;
+  }
 
   TOPIC_PREFIX = `geotrack_minimal_v1/${roomId}`;
   MY_TOPIC = `${TOPIC_PREFIX}/${myId}`;
@@ -1498,6 +1620,16 @@ window.addEventListener('beforeunload', () => {
 
 // Initial Session Startup
 async function initSession() {
+  if (inviteParams.cartoKey) {
+    refreshTileLayer();
+  }
+
+  // If opening via an invite link with preloaded password, open the modal so the user enters their name
+  if (inviteParams.fromInvite && inviteParams.pwd) {
+    openE2EEModal();
+    return;
+  }
+
   if (currentRoomPassword) {
     e2eeCryptoKey = await deriveKeyFromPassword(currentRoomPassword, `geotrack_salt_v1_${roomId}`);
     startGeolocationTracking();

@@ -895,6 +895,34 @@ html, body {
   transform: scale(0.99);
 }
 
+#share-room-btn {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #1d4ed8;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+}
+
+#share-room-btn:hover {
+  background: #1d4ed8;
+  border-color: #1e40af;
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+}
+
+.plain-link-btn {
+  font-size: 14.5px !important;
+  padding: 12px 14px !important;
+  color: #475569 !important;
+  border-color: #cbd5e1 !important;
+  background: #f8fafc !important;
+}
+
+.plain-link-btn:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
 .change-group-btn {
   background: #f8fafc;
   border: 2px solid #cbd5e1;
@@ -919,6 +947,26 @@ html, body {
   border-color: #7dd3fc;
   color: #38bdf8;
   transform: translateY(-1px);
+}
+
+.invite-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #eff6ff;
+  border: 2px solid #93c5fd;
+  border-radius: 14px;
+  padding: 14px 16px;
+  color: #1e40af;
+  font-size: 14.5px;
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+.invite-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #2563eb;
 }
 
 .privacy-text-link {

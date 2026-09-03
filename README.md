@@ -54,14 +54,18 @@ I server CARTO richiedono una chiave API per l'accesso ai basemap senza watermar
 
 ---
 
-## 🧭 Guida all'Uso
+## 🧭 Guida all'Uso & Link Invito Magico
 
 1. **Accesso al Gruppo**:
    - Inserisci il **Nome del Gruppo** (es. `Escursione Monte Bianco`).
    - Scegli una **Password del Gruppo** (chiunque abbia la stessa password potrà decifrare e vedere la posizione degli altri membri).
    - Inserisci il **Tuo Nome** visualizzato.
-2. **Condivisione**:
-   - Clicca sull'icona della stanza in alto a sinistra per aprire la lista partecipanti e clicca su **"Copia Link del Gruppo"** per invitare i tuoi amici o familiari.
+2. **🔗 Link Invito "Zero Sforzo" (Magic Link)**:
+   - Clicca sulla barra in alto (partecipanti) e seleziona **"🔗 Copia Link Invito (con Password)"**.
+   - Il link generato conterrà già il **nome del gruppo**, la **password cifrata** e la **chiave mappa CARTO** all'interno dell'ancora URL (`#group=...&pwd=...&carto_key=...`).
+   - **Privacy garantita**: Essendo memorizzati dopo l'hash (`#`), i parametri rimangono puramente lato client nel browser e **non vengono mai trasmessi ai server web o ai log di rete**.
+   - Chi apre il link si ritrova **gruppo, password e mappa già configurati**: deve solo digitare il proprio nome ed è subito connesso!
+   - È disponibile anche l'opzione **"Copia Link solo Gruppo (senza password)"** se preferisci comunicare la password a voce o su un canale separato.
 3. **Gestione Tracciamento**:
    - Premi il grande pulsante centrale **"FERMA CONDIVISIONE"** / **"AVVIA CONDIVISIONE"** per mettere in pausa o riprendere la condivisione GPS in qualunque istante.
    - Usa il pulsante mirino per ricentrare istantaneamente la mappa su di te.
