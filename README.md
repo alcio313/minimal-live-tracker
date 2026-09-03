@@ -19,10 +19,11 @@ Una web application ultra-veloce, minimale, ad alta accessibilità e moderna per
 - 🔊 & 📳 **Feedback Multi-Sensoriale (Suono & Vibrazione)**:
   - Sintesi audio acustica tramite `Web Audio API` (chime armonico ascendente all'avvio, discendente alla pausa).
   - Feedback aptico con vibrazione sequenziale tramite `Vibration API` su smartphone.
-- 🔋 **Algoritmo Risparmio Batteria Eco**:
-  - Campionamento intelligente con finestra temporale di 15 secondi.
-  - Filtro di movimento matematico Haversine (ignora micro-spostamenti < 10 metri).
-  - Cache GNSS hardware `maximumAge` per consentire cicli di riposo ottimali al chip GPS.
+- 🔋 **Algoritmo Risparmio Batteria Eco & Polling Duty-Cycle**:
+  - Polling hardware intermittente tramite `getCurrentPosition` cadenzato a 15 secondi: consente al chip GNSS di entrare in idle tra una lettura e l'altra (a differenza di `watchPosition` continuo con `enableHighAccuracy` che tiene il circuito GPS sempre attivo).
+  - Filtro di movimento matematico Haversine (ignora micro-spostamenti < 10 metri per azzerare il traffico radio MQTT se l'utente è fermo).
+- 🔆 **Screen Wake Lock API (Tracciamento Continuo)**:
+  - Mantiene automaticamente lo schermo acceso su smartphone durante la condivisione attiva, prevenendo la sospensione di JavaScript, GPS e connessione WebSockets causata dal blocco schermo su iOS e Android.
 - 📱 **Progressive Web App (PWA) & Supporto Offline**:
   - Installabile come app nativa a schermo intero su Android e iOS.
   - Service Worker avanzato con cache delle porzioni di mappa già visualizzate e funzionamento autonomo del GPS anche in assenza temporanea di rete.
@@ -33,29 +34,6 @@ Una web application ultra-veloce, minimale, ad alta accessibilità e moderna per
 
 ---
 
-## 🚀 Avvio Rapido
-
-### Utilizzo Online
-Apri semplicemente il link della demo: [https://alcio313.github.io/minimal-live-tracker/](https://alcio313.github.io/minimal-live-tracker/)
-
-### Esecuzione in Locale
-Poiché l'applicazione sfrutta **WebCrypto API** e **Service Worker**, è necessario avviarla tramite un server HTTP (o in locale su `localhost`):
-
-#### Opzione 1: PowerShell (Server integrato)
-```powershell
-.\serve.ps1
-```
-Apri il browser su: `http://localhost:8080/`
-
-#### Opzione 2: Python HTTP Server
-```bash
-python -m http.server 8080
-```
-
-#### Opzione 3: Node.js / npx serve
-```bash
-npx serve .
-```
 
 ### 🗺️ Configurazione Chiave CARTO Basemaps (Opzionale)
 I server CARTO richiedono una chiave API per l'accesso ai basemap senza watermark. L'applicazione non contiene chiavi hardcoded per prevenire leak di sicurezza. Puoi configurare la tua chiave gratuita nei seguenti modi:
@@ -141,6 +119,7 @@ minimal-live-tracker/
 - **Leaflet.js** (Rendering mappe vettoriali e raster)
 - **CartoDB Voyager Basemap Tiles** (Tile chiare ad alto contrasto)
 - **MQTT.js over WebSockets** (Broker real-time serverless P2P-like)
+- **Screen Wake Lock API** (Prevenzione standby dello schermo per continuità del GPS mobile)
 - **Service Worker API & Cache Storage** (Architettura offline-first PWA)
 
 ---

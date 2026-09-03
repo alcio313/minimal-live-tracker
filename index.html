@@ -61,6 +61,17 @@
         </span>
       </div>
     </div>
+
+    <!-- Screen Wake Lock Pill Indicator -->
+    <div class="wakelock-pill" id="wakelock-pill" title="Lo schermo rimane acceso per consentire a iOS e Android il tracciamento GPS continuo">
+      <span class="wakelock-sun-icon">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+          <path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3zm0-10a1 1 0 0 0 1-1V2a1 1 0 0 0-2 0v2a1 1 0 0 0 1 1zm0 14a1 1 0 0 0-1 1v2a1 1 0 0 0 2 0v-2a1 1 0 0 0-1-1zm8-8a1 1 0 0 0-1 1 1 1 0 0 0 1 1h2a1 1 0 0 0 0-2h-2zm-15 0a1 1 0 0 0-1-1H2a1 1 0 0 0 0 2h2a1 1 0 0 0 1-1zm13.66-5.66a1 1 0 0 0-1.41 0 1 1 0 0 0 0 1.41l1.41 1.41a1 1 0 0 0 1.41-1.41l-1.41-1.41zm-11.32 11.32a1 1 0 0 0-1.41 0l-1.41 1.41a1 1 0 0 0 1.41 1.41l1.41-1.41a1 1 0 0 0 0-1.41zm11.32 0l-1.41 1.41a1 1 0 0 0 1.41 1.41l1.41-1.41a1 1 0 0 0-1.41-1.41zM6.75 6.75a1 1 0 0 0 0-1.41L5.34 3.93a1 1 0 0 0-1.41 1.41l1.41 1.41a1 1 0 0 0 1.41 0z"/>
+        </svg>
+      </span>
+      <span>Schermo attivo</span>
+    </div>
+
     <div id="toast" class="toast">Link stanza copiato!</div>
   </div>
 
@@ -150,6 +161,19 @@
         <div class="participants-list" id="participants-list">
           <!-- Populated dynamically via JS -->
         </div>
+      </div>
+
+      <!-- Wake Lock & Background Tracking Notice -->
+      <div class="wakelock-notice-card">
+        <div class="wakelock-notice-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3zm0-10a1 1 0 0 0 1-1V2a1 1 0 0 0-2 0v2a1 1 0 0 0 1 1zm0 14a1 1 0 0 0-1 1v2a1 1 0 0 0 2 0v-2a1 1 0 0 0-1-1zm8-8a1 1 0 0 0-1 1 1 1 0 0 0 1 1h2a1 1 0 0 0 0-2h-2zm-15 0a1 1 0 0 0-1-1H2a1 1 0 0 0 0 2h2a1 1 0 0 0 1-1z"/>
+          </svg>
+          <span>Tracciamento Continuo a Schermo Acceso</span>
+        </div>
+        <p class="wakelock-notice-text">
+          iOS e Android sospendono il GPS a schermo spento. L'app usa la <strong>Screen Wake Lock API</strong> per mantenere acceso lo schermo durante il tracciamento ed effettua una lettura GPS ogni 15 secondi per risparmiare batteria.
+        </p>
       </div>
 
       <!-- Share Room Footer -->

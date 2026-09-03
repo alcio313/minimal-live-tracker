@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tracker-app-v1.0.1';
+const CACHE_NAME = 'tracker-app-v1.0.2';
 const MAP_CACHE_NAME = 'tracker-map-tiles-v1';
 const MAX_TILE_ENTRIES = 800;
 

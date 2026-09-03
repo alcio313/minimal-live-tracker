@@ -233,11 +233,61 @@ let myPolyline = null;
 let hasInitialGPSFix = false;
 
 let isTracking = true;
-let geoWatchId = null;
+let geoIntervalId = null;
+let isFetchingPosition = false;
+let wakeLockSentinel = null;
 let simIntervalId = null;
 let simLat = 41.9028;
 let simLng = 12.4964;
 let simAngle = Math.random() * Math.PI * 2;
+
+// Screen Wake Lock API Management (prevents mobile OS suspending JS and GPS)
+const wakelockPill = document.getElementById('wakelock-pill');
+
+function updateWakeLockUI() {
+  if (wakelockPill) {
+    if (wakeLockSentinel && isTracking) {
+      wakelockPill.classList.add('is-active');
+    } else {
+      wakelockPill.classList.remove('is-active');
+    }
+  }
+}
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    if (!wakeLockSentinel && isTracking) {
+      wakeLockSentinel = await navigator.wakeLock.request('screen');
+      wakeLockSentinel.addEventListener('release', () => {
+        wakeLockSentinel = null;
+        updateWakeLockUI();
+      });
+      updateWakeLockUI();
+    }
+  } catch (err) {
+    console.warn('Wake Lock request error:', err);
+  }
+}
+
+async function releaseWakeLock() {
+  if (wakeLockSentinel) {
+    try {
+      await wakeLockSentinel.release();
+    } catch (e) {}
+    wakeLockSentinel = null;
+    updateWakeLockUI();
+  }
+}
+
+// Re-acquire Wake Lock when tab becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && isTracking) {
+    requestWakeLock();
+    // Also take an immediate fresh fix upon returning to the app
+    fetchCurrentGpsPosition();
+  }
+});
 
 // Allow desktop simulation only if explicitly requested (?sim=1) or during local development
 function isSimulationAllowed() {
@@ -553,10 +603,9 @@ function updateMyPosition(lat, lng, force = false) {
     return;
   }
 
-  // Filter 2: Has at least 15 seconds passed since the last broadcast?
+  // Filter 2: Has at least 12 seconds passed since the last broadcast? (prevents timer jitter issues on 15s intervals)
   const timeElapsed = now - lastBroadcastTime;
-  if (timeElapsed < SAMPLING_INTERVAL_MS) {
-    // Less than 15s -> hold update until 15s window completes
+  if (timeElapsed < 12000) {
     return;
   }
 
@@ -848,47 +897,81 @@ client.on('message', async (topic, message) => {
   }
 });
 
-// Start High Accuracy GPS Tracking (Optimized with 10s cached fix & 15s sampling)
-function startGeolocationTracking() {
-  if (!e2eeCryptoKey) return;
-  if ('geolocation' in navigator) {
-    geoWatchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        updateMyPosition(lat, lng);
-      },
-      (err) => {
-        console.warn('Geolocation notice:', err.message);
-        if (myTrail.length === 0 && !simIntervalId) {
-          if (isSimulationAllowed()) {
-            startDesktopSimulation(41.9028, 12.4964);
-          } else {
-            showToast('⚠️ Attiva la posizione');
-          }
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 10000, // 10s GNSS sleep optimization
-        timeout: 20000
-      }
-    );
-  } else {
+// Fetch single position fix using getCurrentPosition (duty-cycled to let GPS chip idle between readings)
+function fetchCurrentGpsPosition() {
+  if (!isTracking || !e2eeCryptoKey || isFetchingPosition) return;
+
+  if (!('geolocation' in navigator)) {
     if (isSimulationAllowed()) {
       startDesktopSimulation(41.9028, 12.4964);
     } else {
-      showToast('⚠️ Attiva la posizione');
+      showToast('⚠️ Geolocalizzazione non supportata');
     }
+    return;
   }
+
+  isFetchingPosition = true;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      isFetchingPosition = false;
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      updateMyPosition(lat, lng);
+    },
+    (err) => {
+      isFetchingPosition = false;
+      console.warn('Geolocation notice:', err.message);
+      if (myTrail.length === 0 && !simIntervalId) {
+        if (isSimulationAllowed()) {
+          startDesktopSimulation(41.9028, 12.4964);
+        } else {
+          showToast('⚠️ Attiva la posizione');
+        }
+      }
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000
+    }
+  );
 }
 
-// Stop GPS / Desktop simulation
-function stopGeolocationTracking() {
-  if (geoWatchId !== null && 'geolocation' in navigator) {
-    navigator.geolocation.clearWatch(geoWatchId);
-    geoWatchId = null;
+// Start Duty-Cycled GPS Tracking (every 15s) and Acquire Screen Wake Lock
+function startGeolocationTracking() {
+  if (!e2eeCryptoKey) return;
+
+  // 1. Keep screen active to prevent mobile OS suspending JS execution
+  requestWakeLock();
+
+  // 2. Clear any existing timer
+  if (geoIntervalId !== null) {
+    clearInterval(geoIntervalId);
+    geoIntervalId = null;
   }
+
+  // 3. Immediate initial fix
+  fetchCurrentGpsPosition();
+
+  // 4. Periodic polling every 15s (allows the hardware GPS chip to power-down between fixes)
+  geoIntervalId = setInterval(() => {
+    fetchCurrentGpsPosition();
+  }, SAMPLING_INTERVAL_MS);
+}
+
+// Stop GPS / Desktop simulation and Release Screen Wake Lock
+function stopGeolocationTracking() {
+  // 1. Release Screen Wake Lock
+  releaseWakeLock();
+
+  // 2. Stop periodic GPS polling
+  if (geoIntervalId !== null) {
+    clearInterval(geoIntervalId);
+    geoIntervalId = null;
+  }
+  isFetchingPosition = false;
+
+  // 3. Stop simulation if active
   if (simIntervalId !== null) {
     clearInterval(simIntervalId);
     simIntervalId = null;
