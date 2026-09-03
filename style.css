@@ -32,10 +32,46 @@ html, body {
   background: #cbd5e1;
 }
 
-/* Hide default Leaflet controls */
-.leaflet-control-container .leaflet-top,
-.leaflet-control-container .leaflet-bottom {
+/* Hide default Leaflet zoom controls since custom accessible buttons are provided */
+.leaflet-control-zoom {
   display: none !important;
+}
+
+/* Accessible & Legible Map Attribution Control (Complies with CARTO and OpenStreetMap ODbL terms) */
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #334155 !important;
+  border-top-left-radius: 8px !important;
+  border: 1px solid rgba(203, 213, 225, 0.6) !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  box-shadow: 0 -2px 6px rgba(15, 23, 42, 0.06) !important;
+  z-index: 800 !important;
+  line-height: 1.4 !important;
+  user-select: text !important;
+}
+
+.leaflet-control-attribution a {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  font-weight: 600 !important;
+}
+
+.leaflet-control-attribution a:hover {
+  color: #1e40af !important;
+}
+
+@media (max-width: 600px) {
+  .leaflet-control-attribution {
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+    max-width: 70vw;
+  }
 }
 
 /* High-Contrast Large Tooltips on Map */
@@ -189,7 +225,7 @@ html, body {
 /* Floating Bottom Center Start/Stop Button (Extra Large & High Contrast) */
 .control-container {
   position: fixed;
-  bottom: 28px;
+  bottom: 34px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;

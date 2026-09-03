@@ -156,19 +156,55 @@ async function decryptPayload(encryptedPacket) {
   }
 }
 
-// 🗺️ Leaflet Map Setup
+// 🗺️ Retrieve CARTO API key dynamically from URL (?carto_key=), local config (config.js), or localStorage
+function getCartoApiKey() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const fromUrl = urlParams.get('carto_key');
+  if (fromUrl && fromUrl.trim()) return fromUrl.trim();
+
+  if (window.APP_CONFIG && typeof window.APP_CONFIG.CARTO_API_KEY === 'string' && window.APP_CONFIG.CARTO_API_KEY.trim()) {
+    return window.APP_CONFIG.CARTO_API_KEY.trim();
+  }
+
+  const fromStorage = localStorage.getItem('carto_api_key');
+  if (fromStorage && fromStorage.trim()) {
+    return fromStorage.trim();
+  }
+
+  return '';
+}
+
+function buildTileUrl(key) {
+  return key
+    ? `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(key)}`
+    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+}
+
+// 🗺️ Leaflet Map Setup with Legally Mandated CARTO and OpenStreetMap (ODbL) Attribution
 const map = L.map('map', {
   zoomControl: false,
-  attributionControl: false,
+  attributionControl: true,
   fadeAnimation: true
 }).setView([41.9028, 12.4964], 15);
 
-const CARTO_API_KEY = 'cb1_2q8y_1_e3a6bfaec866fa48bee47025';
+const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>';
 
-L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`, {
+let currentTileLayer = L.tileLayer(buildTileUrl(getCartoApiKey()), {
   maxZoom: 20,
-  subdomains: 'abcd'
+  subdomains: 'abcd',
+  attribution: CARTO_ATTRIBUTION
 }).addTo(map);
+
+function refreshTileLayer() {
+  if (currentTileLayer) {
+    map.removeLayer(currentTileLayer);
+  }
+  currentTileLayer = L.tileLayer(buildTileUrl(getCartoApiKey()), {
+    maxZoom: 20,
+    subdomains: 'abcd',
+    attribution: CARTO_ATTRIBUTION
+  }).addTo(map);
+}
 
 // Battery Optimization & Sampling Configuration
 const SAMPLING_INTERVAL_MS = 15000; // 15 seconds
@@ -202,6 +238,24 @@ let simIntervalId = null;
 let simLat = 41.9028;
 let simLng = 12.4964;
 let simAngle = Math.random() * Math.PI * 2;
+
+// Allow desktop simulation only if explicitly requested (?sim=1) or during local development
+function isSimulationAllowed() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('sim') === '1') return true;
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+}
+
+function showToast(message, duration = 3000) {
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toast._timeoutId);
+  toast._timeoutId = setTimeout(() => {
+    toast.classList.remove('show');
+  }, duration);
+}
 
 // Peer Store: peerId -> { name, color, trail: [[lat, lng]], marker, polyline, isPaused, lastSeen }
 const peers = new Map();
@@ -807,7 +861,11 @@ function startGeolocationTracking() {
       (err) => {
         console.warn('Geolocation notice:', err.message);
         if (myTrail.length === 0 && !simIntervalId) {
-          startDesktopSimulation(41.9028, 12.4964);
+          if (isSimulationAllowed()) {
+            startDesktopSimulation(41.9028, 12.4964);
+          } else {
+            showToast('⚠️ Attiva la posizione');
+          }
         }
       },
       {
@@ -817,7 +875,11 @@ function startGeolocationTracking() {
       }
     );
   } else {
-    startDesktopSimulation(41.9028, 12.4964);
+    if (isSimulationAllowed()) {
+      startDesktopSimulation(41.9028, 12.4964);
+    } else {
+      showToast('⚠️ Attiva la posizione');
+    }
   }
 }
 
@@ -833,8 +895,9 @@ function stopGeolocationTracking() {
   }
 }
 
-// Fallback: subtle movement if GPS is unavailable (e.g. desktop testing)
+// Fallback: subtle movement if GPS is unavailable (only with ?sim=1 or on localhost)
 function startDesktopSimulation(baseLat, baseLng) {
+  if (!isSimulationAllowed()) return;
   if (simIntervalId || !e2eeCryptoKey) return;
 
   if (myTrail.length === 0) {
@@ -1030,7 +1093,11 @@ function recenterMap() {
       },
       (err) => {
         console.warn('Geolocation notice during recenter:', err);
-        map.flyTo([simLat, simLng], 16, { duration: 0.8 });
+        if (isSimulationAllowed()) {
+          map.flyTo([simLat, simLng], 16, { duration: 0.8 });
+        } else {
+          showToast('⚠️ Attiva la posizione');
+        }
       },
       { enableHighAccuracy: true, timeout: 5000 }
     );
@@ -1145,6 +1212,82 @@ if (togglePwdVisibilityBtn && roomPasswordInput && eyeIcon) {
     eyeIcon.innerHTML = isPass
       ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>`
       : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>`;
+  });
+}
+
+// 🗺️ CARTO Basemaps Key Modal Handlers
+const modalCartoKeyBtn = document.getElementById('modal-carto-key-btn');
+const cartoModal = document.getElementById('carto-modal');
+const closeCartoBtn = document.getElementById('close-carto-btn');
+const cartoApiKeyInput = document.getElementById('carto-api-key-input');
+const saveCartoKeyBtn = document.getElementById('save-carto-key-btn');
+const clearCartoKeyBtn = document.getElementById('clear-carto-key-btn');
+
+function openCartoModal() {
+  if (cartoModal) {
+    if (cartoApiKeyInput) {
+      cartoApiKeyInput.value = localStorage.getItem('carto_api_key') || '';
+    }
+    cartoModal.classList.add('is-open');
+    cartoModal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function closeCartoModal() {
+  if (cartoModal) {
+    cartoModal.classList.remove('is-open');
+    cartoModal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+if (modalCartoKeyBtn) {
+  modalCartoKeyBtn.addEventListener('click', () => {
+    closeParticipantsModal();
+    openCartoModal();
+  });
+}
+
+if (closeCartoBtn) {
+  closeCartoBtn.addEventListener('click', closeCartoModal);
+}
+
+if (cartoModal) {
+  cartoModal.addEventListener('click', (e) => {
+    if (e.target === cartoModal) {
+      closeCartoModal();
+    }
+  });
+}
+
+if (saveCartoKeyBtn) {
+  saveCartoKeyBtn.addEventListener('click', () => {
+    const key = (cartoApiKeyInput ? cartoApiKeyInput.value : '').trim();
+    if (key) {
+      localStorage.setItem('carto_api_key', key);
+    } else {
+      localStorage.removeItem('carto_api_key');
+    }
+    refreshTileLayer();
+    closeCartoModal();
+    if (toast) {
+      toast.textContent = key ? 'Chiave CARTO salvata!' : 'Chiave CARTO rimossa';
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+  });
+}
+
+if (clearCartoKeyBtn) {
+  clearCartoKeyBtn.addEventListener('click', () => {
+    localStorage.removeItem('carto_api_key');
+    if (cartoApiKeyInput) cartoApiKeyInput.value = '';
+    refreshTileLayer();
+    closeCartoModal();
+    if (toast) {
+      toast.textContent = 'Chiave CARTO rimossa';
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2200);
+    }
   });
 }
 

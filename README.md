@@ -57,6 +57,23 @@ python -m http.server 8080
 npx serve .
 ```
 
+### 🗺️ Configurazione Chiave CARTO Basemaps (Opzionale)
+I server CARTO richiedono una chiave API per l'accesso ai basemap senza watermark. L'applicazione non contiene chiavi hardcoded per prevenire leak di sicurezza. Puoi configurare la tua chiave gratuita nei seguenti modi:
+
+1. **Da interfaccia utente (consigliato su GitHub Pages)**:
+   - Clicca sulla barra in alto (partecipanti) -> **"🗺️ Chiave CARTO Basemaps"**.
+   - Incolla la tua chiave e clicca **"Salva Chiave"**. La chiave viene salvata esclusivamente nel tuo browser (`localStorage`).
+2. **In sviluppo locale (file config.js)**:
+   - Copia il template `config.example.js` in `config.js`:
+     ```powershell
+     cp config.example.js config.js
+     ```
+   - Inserisci la tua chiave in `config.js` (il file è escluso da Git tramite `.gitignore`).
+3. **Tramite URL**:
+   - Aggiungi `?carto_key=LA_TUA_CHIAVE` al link della pagina.
+
+> 🔑 Per ottenere una chiave gratuita senza carta di credito, visita [carto.com/basemaps/apikey](https://carto.com/basemaps/apikey).
+
 ---
 
 ## 🧭 Guida all'Uso
@@ -128,9 +145,11 @@ minimal-live-tracker/
 
 ---
 
-## 📄 Licenza & Privacy
+## 📄 Licenza, Privacy & Attribuzione Mappe
 
-Rilasciato sotto licenza open source. L'applicazione rispetta pienamente i principi di **Privacy by Design** e le normative **GDPR**, non registrando alcun dato su database esterni.
+- **Licenza Software**: Rilasciato sotto licenza open source.
+- **Privacy & GDPR**: L'applicazione rispetta pienamente i principi di **Privacy by Design** e le normative **GDPR**, non registrando alcun dato su database esterni ed eliminando le posizioni alla chiusura della sessione.
+- **Attribuzione Dati Mappe**: Le mappe visualizzate utilizzano dati forniti da **OpenStreetMap** (rilasciati sotto licenza [Open Data Commons Open Database License - ODbL](https://www.openstreetmap.org/copyright)) e tile layer forniti da **CARTO** (sotto i relativi [termini di attribuzione CARTO](https://carto.com/attributions)). L'applicazione include crediti visibili e conformi direttamente sulla mappa.
 
 ---
 
