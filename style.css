@@ -11,7 +11,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html, body {
+html,
+body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
@@ -147,10 +148,12 @@ html, body {
     transform: scale(0.4);
     opacity: 0.8;
   }
+
   70% {
     transform: scale(2.4);
     opacity: 0;
   }
+
   100% {
     transform: scale(2.8);
     opacity: 0;
@@ -317,10 +320,12 @@ html, body {
     transform: scale(0.95);
     box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
   }
+
   70% {
     transform: scale(1.1);
     box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
   }
+
   100% {
     transform: scale(0.95);
     box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
@@ -332,10 +337,12 @@ html, body {
     transform: scale(0.95);
     box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
   }
+
   70% {
     transform: scale(1.1);
     box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
   }
+
   100% {
     transform: scale(0.95);
     box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
@@ -477,11 +484,32 @@ html, body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   user-select: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   animation: fadeInPill 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wakelock-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+}
+
+.wakelock-pill:active {
+  transform: translateY(0);
 }
 
 .wakelock-pill.is-active {
   display: inline-flex;
+  border-color: #fde047;
+  color: #b45309;
+  background: rgba(255, 255, 255, 0.97);
+}
+
+.wakelock-pill.is-disabled {
+  display: inline-flex;
+  border-color: #cbd5e1;
+  color: #64748b;
+  background: rgba(248, 250, 252, 0.94);
 }
 
 .wakelock-sun-icon {
@@ -491,14 +519,31 @@ html, body {
   animation: rotate-sun 12s linear infinite;
 }
 
+.wakelock-pill.is-disabled .wakelock-sun-icon {
+  color: #94a3b8;
+  animation: none;
+}
+
 @keyframes rotate-sun {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes fadeInPill {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Toast for copy confirmation */
@@ -836,29 +881,122 @@ html, body {
   background: currentColor;
 }
 
-/* Wake Lock Notice Card */
+/* Wake Lock & Honest Battery Advice Section */
 .wakelock-notice-card {
   margin: 14px 26px 0 26px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-radius: 14px;
-  background: #f0fdf4;
-  border: 1.5px solid #bbf7d0;
+  background: #fffbeb;
+  border: 1.5px solid #fde68a;
 }
 
-.wakelock-notice-title {
+.wakelock-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.wakelock-toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wakelock-toggle-label {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #78350f;
+}
+
+.wakelock-toggle-hint {
+  font-size: 11.5px;
+  color: #92400e;
+  font-weight: 500;
+}
+
+/* Custom iOS-style Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 26px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 9999px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #d97706;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+/* Battery Honest Advice Box */
+.battery-honest-box {
+  margin: 6px 0 10px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+.battery-honest-header {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #15803d;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
-  margin-bottom: 5px;
+  color: #92400e;
+  margin-bottom: 4px;
+}
+
+.battery-honest-text {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #78350f;
+  font-weight: 500;
+  margin: 0;
 }
 
 .wakelock-notice-text {
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: #166534;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #92400e;
+  margin: 0;
 }
 
 /* Modal Footer */
@@ -1172,8 +1310,3 @@ html, body {
     max-height: 60vh;
   }
 }
-
-
-
-
-

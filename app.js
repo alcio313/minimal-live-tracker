@@ -258,6 +258,9 @@ let currentTileLayer = L.tileLayer(buildTileUrl(getCartoApiKey()), {
   attribution: CARTO_ATTRIBUTION
 }).addTo(map);
 
+// Trail layer group for rendering solid and dashed gap segments
+const myTrailLayer = L.layerGroup().addTo(map);
+
 function refreshTileLayer() {
   if (currentTileLayer) {
     map.removeLayer(currentTileLayer);
@@ -275,6 +278,9 @@ const MIN_DISTANCE_METERS = 10;     // 10 meters
 
 let lastBroadcastTime = 0;
 let lastRecordedPos = null;
+let lastRecordedPosTime = 0;
+let lastHiddenTime = 0;
+let pendingGap = null;
 
 // Haversine Distance Formula (in meters)
 function getDistanceInMeters(lat1, lon1, lat2, lon2) {
@@ -292,13 +298,13 @@ function getDistanceInMeters(lat1, lon1, lat2, lon2) {
 // Data Structures & Tracking State
 let myTrail = [];
 let myMarker = null;
-let myPolyline = null;
 let hasInitialGPSFix = false;
 
 let isTracking = true;
 let geoIntervalId = null;
 let isFetchingPosition = false;
 let wakeLockSentinel = null;
+let wakeLockUserEnabled = localStorage.getItem('mlt_wake_lock_enabled') !== 'false';
 let simIntervalId = null;
 let simLat = 41.9028;
 let simLng = 12.4964;
@@ -306,18 +312,76 @@ let simAngle = Math.random() * Math.PI * 2;
 
 // Screen Wake Lock API Management (prevents mobile OS suspending JS and GPS)
 const wakelockPill = document.getElementById('wakelock-pill');
+const wakelockPillText = document.getElementById('wakelock-pill-text');
+const wakelockSwitch = document.getElementById('wakelock-switch');
+const wakelockStatusHint = document.getElementById('wakelock-status-hint');
 
 function updateWakeLockUI() {
+  if (wakelockSwitch) {
+    wakelockSwitch.checked = wakeLockUserEnabled;
+  }
+  if (wakelockStatusHint) {
+    wakelockStatusHint.textContent = wakeLockUserEnabled
+      ? 'Attivo (consigliato per GPS continuo)'
+      : 'Disattivato (lo schermo andrà in standby)';
+  }
   if (wakelockPill) {
-    if (wakeLockSentinel && isTracking) {
-      wakelockPill.classList.add('is-active');
+    if (!isTracking) {
+      wakelockPill.style.display = 'none';
+      return;
+    }
+    wakelockPill.style.display = 'inline-flex';
+    if (wakeLockUserEnabled) {
+      wakelockPill.className = 'wakelock-pill is-active';
+      if (wakelockPillText) wakelockPillText.textContent = 'Schermo attivo';
+      wakelockPill.title = 'Schermo sempre attivo (clicca per consentire standby)';
     } else {
-      wakelockPill.classList.remove('is-active');
+      wakelockPill.className = 'wakelock-pill is-disabled';
+      if (wakelockPillText) wakelockPillText.textContent = 'Schermo: standby';
+      wakelockPill.title = 'Schermo standard (clicca per attivare schermo sempre acceso)';
     }
   }
 }
 
+function setWakeLockEnabled(enabled, showFeedback = true) {
+  wakeLockUserEnabled = enabled;
+  localStorage.setItem('mlt_wake_lock_enabled', enabled ? 'true' : 'false');
+  if (enabled) {
+    if (isTracking) {
+      requestWakeLock();
+    }
+    if (showFeedback) {
+      showToast('☀️ Schermo sempre attivo abilitato');
+    }
+  } else {
+    releaseWakeLock();
+    if (showFeedback) {
+      showToast('🌙 Schermo normale: il display andrà in standby');
+    }
+  }
+  updateWakeLockUI();
+}
+
+if (wakelockPill) {
+  wakelockPill.addEventListener('click', () => {
+    setWakeLockEnabled(!wakeLockUserEnabled, true);
+  });
+  wakelockPill.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setWakeLockEnabled(!wakeLockUserEnabled, true);
+    }
+  });
+}
+
+if (wakelockSwitch) {
+  wakelockSwitch.addEventListener('change', (e) => {
+    setWakeLockEnabled(e.target.checked, true);
+  });
+}
+
 async function requestWakeLock() {
+  if (!wakeLockUserEnabled) return;
   if (!('wakeLock' in navigator)) return;
   try {
     if (!wakeLockSentinel && isTracking) {
@@ -337,20 +401,108 @@ async function releaseWakeLock() {
   if (wakeLockSentinel) {
     try {
       await wakeLockSentinel.release();
-    } catch (e) {}
+    } catch (e) { }
     wakeLockSentinel = null;
     updateWakeLockUI();
   }
 }
 
-// Re-acquire Wake Lock when tab becomes visible again
+// Suspension / Inactivity Gap Detection & Resume Handler
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && isTracking) {
-    requestWakeLock();
-    // Also take an immediate fresh fix upon returning to the app
-    fetchCurrentGpsPosition();
+  if (document.visibilityState === 'hidden') {
+    lastHiddenTime = Date.now();
+  } else if (document.visibilityState === 'visible') {
+    const now = Date.now();
+    if (lastHiddenTime > 0) {
+      const elapsedMs = now - lastHiddenTime;
+      const elapsedMinutes = Math.round(elapsedMs / 60000);
+
+      // If suspended for >= 60 seconds (1 minute or more)
+      if (elapsedMs >= 60000) {
+        const msg = elapsedMinutes <= 1
+          ? '⚠️ Tracciamento interrotto per circa 1 minuto'
+          : `⚠️ Tracciamento interrotto per ${elapsedMinutes} minuti`;
+        showToast(msg, 5000);
+
+        if (myTrail.length > 0) {
+          pendingGap = {
+            durationMinutes: Math.max(1, elapsedMinutes),
+            timestamp: now
+          };
+        }
+      }
+      lastHiddenTime = 0;
+    }
+
+    if (isTracking && wakeLockUserEnabled) {
+      requestWakeLock();
+    }
+    if (isTracking) {
+      // Immediate fresh fix upon returning to the app
+      fetchCurrentGpsPosition();
+    }
   }
 });
+
+// Segmented Trail Renderer: Draws solid continuous walking and dashed gap lines
+function renderTrailLayer(layerGroup, trail, color) {
+  if (!layerGroup) return;
+  layerGroup.clearLayers();
+  if (!Array.isArray(trail) || trail.length < 2) return;
+
+  let currentSolidSegment = [[trail[0][0], trail[0][1]]];
+
+  for (let i = 1; i < trail.length; i++) {
+    const prevPt = [trail[i - 1][0], trail[i - 1][1]];
+    const currPt = [trail[i][0], trail[i][1]];
+    const isGap = trail[i][2] === 1 || Boolean(trail[i].isGap);
+    const gapMin = trail[i][3] || trail[i].gapMinutes || 0;
+
+    if (isGap) {
+      // Flush prior continuous solid segment
+      if (currentSolidSegment.length > 1) {
+        L.polyline(currentSolidSegment, {
+          color: color,
+          weight: 6,
+          opacity: 0.95,
+          smoothFactor: 1,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(layerGroup);
+      }
+      currentSolidSegment = [currPt];
+
+      // Draw dashed segment connecting the gap
+      const gapPolyline = L.polyline([prevPt, currPt], {
+        color: color,
+        weight: 4.5,
+        opacity: 0.8,
+        dashArray: '7, 9',
+        lineCap: 'round'
+      }).addTo(layerGroup);
+
+      const label = gapMin > 0 ? `Interruzione: ~${gapMin} min` : 'Interruzione tracciamento';
+      gapPolyline.bindTooltip(label, {
+        sticky: true,
+        direction: 'top'
+      });
+    } else {
+      currentSolidSegment.push(currPt);
+    }
+  }
+
+  // Flush remaining solid segment
+  if (currentSolidSegment.length > 1) {
+    L.polyline(currentSolidSegment, {
+      color: color,
+      weight: 6,
+      opacity: 0.95,
+      smoothFactor: 1,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(layerGroup);
+  }
+}
 
 // Allow desktop simulation only if explicitly requested (?sim=1) or during local development
 function isSimulationAllowed() {
@@ -623,39 +775,29 @@ function updateMyPosition(lat, lng, force = false) {
   if (!isTracking || !e2eeCryptoKey) return;
 
   const now = Date.now();
-  const coord = [lat, lng];
 
   // If initial fix or forced, accept and broadcast immediately
   if (!hasInitialGPSFix || force) {
     hasInitialGPSFix = true;
     lastBroadcastTime = now;
-    lastRecordedPos = coord;
+    lastRecordedPosTime = now;
+    lastRecordedPos = [lat, lng];
+
+    const coord = [lat, lng, 0, 0];
     myTrail.push(coord);
 
     if (!myMarker) {
-      myMarker = L.marker(coord, {
+      myMarker = L.marker([lat, lng], {
         icon: createMarkerIcon(myColor, true),
         zIndexOffset: 1000
       }).addTo(map);
       myMarker.bindTooltip(`${escapeHtml(myName)} (Tu)`, { permanent: true, direction: 'top', offset: [0, -14] });
     } else {
-      myMarker.setLatLng(coord);
+      myMarker.setLatLng([lat, lng]);
     }
 
-    if (!myPolyline) {
-      myPolyline = L.polyline(myTrail, {
-        color: myColor,
-        weight: 6.5,
-        opacity: 0.95,
-        smoothFactor: 1,
-        lineCap: 'round',
-        lineJoin: 'round'
-      }).addTo(map);
-    } else {
-      myPolyline.setLatLngs(myTrail);
-    }
-
-    map.setView(coord, 16, { animate: true });
+    renderTrailLayer(myTrailLayer, myTrail, myColor);
+    map.setView([lat, lng], 16, { animate: true });
 
     broadcast({
       type: 'pos',
@@ -670,7 +812,7 @@ function updateMyPosition(lat, lng, force = false) {
 
   // Smoothly update visual marker position on local device
   if (myMarker) {
-    myMarker.setLatLng(coord);
+    myMarker.setLatLng([lat, lng]);
   }
 
   // Calculate distance moved from last recorded GPS point (Haversine in meters)
@@ -690,23 +832,32 @@ function updateMyPosition(lat, lng, force = false) {
     return;
   }
 
+  // Check for prolonged suspension / inactivity gap (e.g. >= 2 min) if not already flagged
+  if (lastRecordedPosTime > 0 && (now - lastRecordedPosTime) >= 120000 && !pendingGap) {
+    const gapMin = Math.round((now - lastRecordedPosTime) / 60000);
+    showToast(`⚠️ Tracciamento interrotto per ${gapMin} minuti`, 5000);
+    pendingGap = {
+      durationMinutes: gapMin,
+      timestamp: now
+    };
+  }
+
+  let isGap = false;
+  let gapDuration = 0;
+  if (pendingGap && myTrail.length > 0) {
+    isGap = true;
+    gapDuration = pendingGap.durationMinutes;
+    pendingGap = null;
+  }
+
   // Both conditions met: >= 10m moved AND >= 15s elapsed
+  const coord = [lat, lng, isGap ? 1 : 0, gapDuration];
   lastBroadcastTime = now;
-  lastRecordedPos = coord;
+  lastRecordedPosTime = now;
+  lastRecordedPos = [lat, lng];
   myTrail.push(coord);
 
-  if (!myPolyline) {
-    myPolyline = L.polyline(myTrail, {
-      color: myColor,
-      weight: 6.5,
-      opacity: 0.95,
-      smoothFactor: 1,
-      lineCap: 'round',
-      lineJoin: 'round'
-    }).addTo(map);
-  } else {
-    myPolyline.setLatLngs(myTrail);
-  }
+  renderTrailLayer(myTrailLayer, myTrail, myColor);
 
   broadcast({
     type: 'pos',
@@ -729,7 +880,7 @@ function updatePeerPosition(id, color, coord, name) {
       color: color || stringToColor(id),
       trail: [],
       marker: null,
-      polyline: null,
+      trailLayer: L.layerGroup().addTo(map),
       isPaused: false,
       lastSeen: Date.now()
     };
@@ -740,34 +891,27 @@ function updatePeerPosition(id, color, coord, name) {
   }
 
   peer.trail.push(coord);
+  const latLng = [coord[0], coord[1]];
 
   // Update or create peer marker (48px Senior Accessible)
   if (!peer.marker) {
-    peer.marker = L.marker(coord, {
+    peer.marker = L.marker(latLng, {
       icon: createMarkerIcon(peer.color, false),
       zIndexOffset: 500
     }).addTo(map);
     peer.marker.bindTooltip(escapeHtml(peer.name), { permanent: true, direction: 'top', offset: [0, -14] });
   } else {
-    peer.marker.setLatLng(coord);
+    peer.marker.setLatLng(latLng);
     if (name) {
       peer.marker.setTooltipContent(escapeHtml(name));
     }
   }
 
-  // Update or create peer polyline
-  if (!peer.polyline) {
-    peer.polyline = L.polyline(peer.trail, {
-      color: peer.color,
-      weight: 6.5,
-      opacity: 0.95,
-      smoothFactor: 1,
-      lineCap: 'round',
-      lineJoin: 'round'
-    }).addTo(map);
-  } else {
-    peer.polyline.setLatLngs(peer.trail);
+  // Update peer trail segments
+  if (!peer.trailLayer) {
+    peer.trailLayer = L.layerGroup().addTo(map);
   }
+  renderTrailLayer(peer.trailLayer, peer.trail, peer.color);
 }
 
 // Synchronize Full Past Trail for a Peer
@@ -781,7 +925,7 @@ function syncPeerTrail(id, color, fullTrail, name) {
       color: color || stringToColor(id),
       trail: [],
       marker: null,
-      polyline: null,
+      trailLayer: L.layerGroup().addTo(map),
       isPaused: false,
       lastSeen: Date.now()
     };
@@ -793,45 +937,44 @@ function syncPeerTrail(id, color, fullTrail, name) {
 
   peer.trail = fullTrail;
   const lastCoord = fullTrail[fullTrail.length - 1];
+  const latLng = [lastCoord[0], lastCoord[1]];
 
   if (!peer.marker) {
-    peer.marker = L.marker(lastCoord, {
+    peer.marker = L.marker(latLng, {
       icon: createMarkerIcon(peer.color, false),
       zIndexOffset: 500
     }).addTo(map);
     peer.marker.bindTooltip(escapeHtml(peer.name), { permanent: true, direction: 'top', offset: [0, -14] });
   } else {
-    peer.marker.setLatLng(lastCoord);
+    peer.marker.setLatLng(latLng);
     if (name) {
       peer.marker.setTooltipContent(escapeHtml(name));
     }
   }
 
-  if (!peer.polyline) {
-    peer.polyline = L.polyline(peer.trail, {
-      color: peer.color,
-      weight: 6.5,
-      opacity: 0.95,
-      smoothFactor: 1,
-      lineCap: 'round',
-      lineJoin: 'round'
-    }).addTo(map);
-  } else {
-    peer.polyline.setLatLngs(peer.trail);
+  if (!peer.trailLayer) {
+    peer.trailLayer = L.layerGroup().addTo(map);
   }
+  renderTrailLayer(peer.trailLayer, peer.trail, peer.color);
 }
 
 // 📡 Real-Time Serverless Network (MQTT over WebSockets)
-const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
+// Dedicated HiveMQ Cloud cluster in EU with TLS WebSockets
+const MQTT_BROKER = 'wss://02c32905ccdb4e97b9cd3860b9ae6f14.s1.eu.hivemq.cloud:8884/mqtt';
+const MQTT_USER = 'tracker_user';
+const MQTT_PASS = '=$GuL>X#N9G;Yum';
+
 let TOPIC_PREFIX = `geotrack_minimal_v1/${roomId}`;
 let MY_TOPIC = `${TOPIC_PREFIX}/${myId}`;
 let ROOM_WILDCARD = `${TOPIC_PREFIX}/+`;
 
 const client = mqtt.connect(MQTT_BROKER, {
   clean: true,
-  connectTimeout: 5000,
+  connectTimeout: 8000,
   reconnectPeriod: 2500,
-  clientId: myId
+  clientId: myId,
+  username: MQTT_USER,
+  password: MQTT_PASS
 });
 
 async function broadcast(data) {
@@ -885,7 +1028,7 @@ client.on('message', async (topic, message) => {
           color: data.color || stringToColor(data.id),
           trail: [],
           marker: null,
-          polyline: null,
+          trailLayer: L.layerGroup().addTo(map),
           isPaused: (data.tracking === false),
           lastSeen: Date.now()
         };
@@ -918,7 +1061,7 @@ client.on('message', async (topic, message) => {
           color: data.color || stringToColor(data.id),
           trail: [],
           marker: null,
-          polyline: null,
+          trailLayer: L.layerGroup().addTo(map),
           isPaused: false,
           lastSeen: Date.now()
         };
@@ -937,7 +1080,7 @@ client.on('message', async (topic, message) => {
           color: data.color || stringToColor(data.id),
           trail: [],
           marker: null,
-          polyline: null,
+          trailLayer: L.layerGroup().addTo(map),
           isPaused: (data.tracking === false),
           lastSeen: Date.now()
         };
@@ -951,8 +1094,13 @@ client.on('message', async (topic, message) => {
     } else if (data.type === 'leave') {
       if (peers.has(data.id)) {
         const leavingPeer = peers.get(data.id);
-        if (leavingPeer && leavingPeer.marker) {
-          map.removeLayer(leavingPeer.marker);
+        if (leavingPeer) {
+          if (leavingPeer.marker) {
+            map.removeLayer(leavingPeer.marker);
+          }
+          if (leavingPeer.trailLayer) {
+            map.removeLayer(leavingPeer.trailLayer);
+          }
         }
         peers.delete(data.id);
         updateParticipantCount();
@@ -1189,6 +1337,7 @@ function updateTrackingButtonUI() {
     }
   }
   renderParticipantsList();
+  updateWakeLockUI();
 }
 
 // Zoom In / Out Controls (Senior Accessibility)
@@ -1243,7 +1392,7 @@ function recenterMap() {
       easeLinearity: 0.25
     });
   } else if (myTrail.length > 0) {
-    const lastCoord = myTrail[myTrail.length - 1];
+    const lastCoord = [myTrail[myTrail.length - 1][0], myTrail[myTrail.length - 1][1]];
     map.flyTo(lastCoord, Math.max(map.getZoom(), 16), {
       duration: 0.8,
       easeLinearity: 0.25
@@ -1620,6 +1769,7 @@ window.addEventListener('beforeunload', () => {
 
 // Initial Session Startup
 async function initSession() {
+  updateWakeLockUI();
   if (inviteParams.cartoKey) {
     refreshTileLayer();
   }
@@ -1732,9 +1882,4 @@ window.addEventListener('online', () => {
 });
 
 initSession();
-
-
-
-
-
 
